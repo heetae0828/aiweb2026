@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>9주차 숙제 — Oracle Cloud E2.1.Micro 인스턴스 만들기</title>
+<style>
+  :root {
+    --accent:#f97316; --accent2:#0ea5e9; --ink:#1a1a2e;
+    --green:#047857; --red:#ef4444; --bg:#f8fafc;
+    --card:#ffffff; --line:#e5e7eb; --muted:#6b7280;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:'Segoe UI','Apple SD Gothic Neo',sans-serif; line-height:1.6; }
+  .wrap { max-width:880px; margin:0 auto; padding:2.5rem 1.4rem 4rem; }
+  h1 { font-size:1.9rem; margin:0 0 0.4rem; letter-spacing:-0.01em; }
+  h2 { font-size:1.25rem; margin:2.2rem 0 0.6rem; padding-top:0.6rem;
+       border-top:1px solid var(--line); color:var(--ink); }
+  h3 { font-size:1.0rem; margin:1.2rem 0 0.4rem; color:var(--green); }
+  p, li { font-size:0.95rem; }
+  code { background:#f1f5f9; color:#be123c; padding:0.1em 0.4em;
+         border-radius:4px; font-family:Menlo,Monaco,monospace; font-size:0.88em; }
+  pre { background:#1e293b; color:#e2e8f0; padding:0.9em 1em;
+        border-radius:8px; overflow-x:auto; font-size:0.82rem; line-height:1.55;
+        font-family:Menlo,Monaco,monospace; }
+  pre code { background:transparent; color:inherit; padding:0; }
+  table { border-collapse:collapse; width:100%; margin:0.6em 0; font-size:0.88rem; }
+  th, td { border:1px solid var(--line); padding:0.5em 0.7em; vertical-align:top; text-align:left; }
+  th { background:#fef3c7; }
+  .hero {
+    background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);
+    color:white; border-radius:14px; padding:1.6rem 1.4rem; margin-bottom:1.6rem;
+  }
+  .hero .badge { display:inline-block; background:rgba(255,255,255,0.22);
+    padding:0.2rem 0.7rem; border-radius:999px; font-size:0.72rem;
+    letter-spacing:0.12em; font-weight:700; }
+  .hero h1 { color:white; margin:0.5rem 0 0.4rem; }
+  .hero p { font-size:0.95rem; opacity:0.95; margin:0; }
+  .card { background:var(--card); border:1px solid var(--line);
+    border-radius:10px; padding:1rem 1.1rem; margin:0.7rem 0; }
+  .danger {
+    background:#fef2f2; border-left:4px solid var(--red);
+    padding:0.7em 1em; border-radius:6px; margin:0.8em 0;
+  }
+  .danger strong { color:var(--red); }
+  .why {
+    background:#fff7ed; border-left:4px solid var(--accent);
+    padding:0.7em 1em; border-radius:6px; margin:0.8em 0;
+  }
+  .ok {
+    background:#ecfdf5; border-left:4px solid var(--green);
+    padding:0.7em 1em; border-radius:6px; margin:0.8em 0;
+  }
+  .step-num {
+    display:inline-block; width:28px; height:28px; border-radius:50%;
+    background:var(--accent); color:white; text-align:center;
+    font-weight:700; line-height:28px; margin-right:0.5rem;
+  }
+  .toc { background:var(--card); border:1px solid var(--line);
+    border-radius:10px; padding:0.9rem 1.1rem; }
+  .toc ol { margin:0.3rem 0 0 1rem; padding:0; }
+  .toc li { margin:0.2rem 0; font-size:0.9rem; }
+  .toc a { color:var(--accent2); text-decoration:none; }
+  .toc a:hover { text-decoration:underline; }
+  .shot { width:100%; max-width:820px; border:1px solid var(--line);
+    border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.06);
+    display:block; margin:0.6rem auto; background:#fff; }
+  .shot-cap { font-size:0.78rem; color:var(--muted); text-align:center; margin:0.2rem 0 0.8rem; }
+  .small { font-size:0.82rem; color:var(--muted); }
+  ul.checks { list-style:none; padding-left:0; }
+  ul.checks li { margin:0.35rem 0; padding-left:1.6rem; position:relative; }
+  ul.checks li::before { content:"☐"; position:absolute; left:0; color:var(--accent2); font-weight:700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hero">
+  <span class="badge">9주차 숙제 · 다음 수업 전</span>
+  <h1>Oracle Cloud E2.1.Micro 인스턴스 만들기</h1>
+  <p>가입 → SSH 키 → VM 생성 → Public IP 발급 → 분배 시트 제출. 카드 + SMS 인증 시간 포함 약 30~45분.</p>
+</div>
+
+<div class="toc">
+  <strong>순서</strong>
+  <ol>
+    <li><a href="#s1">Oracle Cloud 가입</a></li>
+    <li><a href="#s2">SSH 키 만들기 (본인 PC)</a></li>
+    <li><a href="#s3">VM 인스턴스 생성</a></li>
+    <li><a href="#s4">Public IP 확인 + SSH 접속 테스트</a></li>
+    <li><a href="#s5">(권장) 예산 알림 설정</a></li>
+    <li><a href="#s6">Public IP 분배 시트 제출</a></li>
+    <li><a href="#s7">완료 체크리스트</a></li>
+  </ol>
+</div>
+
+<div class="danger">
+  <strong>⛔ 절대 클릭 금지</strong> — Shape 선택 화면에서 <code>VM.Standard.E3.Flex</code>, <code>E4.Flex</code>, <code>E5.Flex</code>는 <strong>유료(월 $35~40)</strong>다. 이 가이드는 <strong><code>VM.Standard.E2.1.Micro</code> (Always Free)</strong> 한 가지만 다룬다.
+</div>
+
+<!-- ============ STEP 1 ============ -->
+<h2 id="s1"><span class="step-num">1</span>Oracle Cloud 가입</h2>
+
+<ol>
+  <li><a href="https://www.oracle.com/cloud/free/" target="_blank">https://www.oracle.com/cloud/free/</a> → <strong>Start for free</strong></li>
+  <li>이메일 → 국가 <strong>South Korea</strong> → SMS 인증 → <strong>카드 등록</strong> (본인 확인용, Always Free 한도 내에서는 청구 0원)</li>
+  <li>홈 리전(Home Region) 선택: <strong>South Korea Central (Seoul)</strong> 또는 <strong>South Korea North-Central (Chuncheon)</strong>
+    <div class="danger"><strong>⚠️ 변경 불가</strong> — 한 번 고르면 못 바꾼다. 한국 리전 둘 중 하나로.</div>
+  </li>
+  <li>가입 끝나면 <a href="https://cloud.oracle.com" target="_blank">https://cloud.oracle.com</a>에서 로그인</li>
+</ol>
+
+<img class="shot" src="images/week09/07_oracle_free_landing.png" alt="Oracle Cloud Free Tier 랜딩 페이지">
+<p class="shot-cap">Start for free 진입점</p>
+
+<img class="shot" src="images/week09/16_oracle_always_free_docs.png" alt="Oracle Always Free 안내 문서">
+<p class="shot-cap">Always Free 한도 (이 안에서는 평생 0원)</p>
+
+<!-- ============ STEP 2 ============ -->
+<h2 id="s2"><span class="step-num">2</span>SSH 키 만들기 (본인 PC, 약 1분)</h2>
+
+<p>인스턴스에 접속할 키 한 쌍을 본인 노트북에서 미리 만든다. 공개키(<code>.pub</code>)는 STEP 3에서 붙여넣고, 개인키는 본인만 보관한다.</p>
+
+<h3>macOS / Linux / WSL</h3>
+<pre><code>mkdir -p ~/.ssh
+ssh-keygen -t ed25519 -f ~/.ssh/oracle_key -N ""
+cat ~/.ssh/oracle_key.pub   # → 출력된 한 줄을 복사</code></pre>
+
+<h3>Windows PowerShell</h3>
+<pre><code>mkdir $env:USERPROFILE\.ssh -ErrorAction SilentlyContinue
+ssh-keygen -t ed25519 -f $env:USERPROFILE\.ssh\oracle_key -N '""'
+Get-Content $env:USERPROFILE\.ssh\oracle_key.pub | clip
+# → 클립보드에 공개키 복사 완료</code></pre>
+
+<div class="why">
+  <strong>왜 미리?</strong> Oracle 콘솔에서 "키 다운로드" 옵션도 있지만, 본인이 만든 키를 붙여넣는 쪽이 더 안전하고 분실 시 재발급도 쉽다.
+</div>
+
+<!-- ============ STEP 3 ============ -->
+<h2 id="s3"><span class="step-num">3</span>VM 인스턴스 생성</h2>
+
+<h3>3-1. 진입</h3>
+<p>좌측 햄버거 메뉴 → <strong>Compute → Instances</strong> 클릭.</p>
+<img class="shot" src="images/week09/50_oracle_compute_menu.png" alt="Oracle Console 사이드바 Compute → Instances 메뉴">
+<p class="shot-cap">햄버거 메뉴 → Compute → Instances</p>
+
+<p>Instances 목록 화면에서 <strong>Create instance</strong> 버튼 클릭.</p>
+
+<h3>3-2. Basic information (Name)</h3>
+<p>원하는 이름 입력. 예: <code>aiweb2026-demo</code>. Compartment는 기본값(루트), Availability domain도 기본값(AD-1) 그대로 둔다.</p>
+<img class="shot" src="images/week09/51_oracle_create_basic.png" alt="Create compute instance — Basic information 입력">
+<p class="shot-cap">Name + Compartment + Availability domain (기본값)</p>
+
+<h3>3-3. Image</h3>
+<p><strong>Change image</strong> → <strong>Canonical Ubuntu 22.04</strong> 선택 → <strong>Select image</strong>.</p>
+<img class="shot" src="images/week09/52_oracle_select_image.png" alt="Select an image — Canonical Ubuntu 22.04 선택">
+<p class="shot-cap">Canonical Ubuntu 22.04 (Free, Shielded instance)</p>
+
+<h3>3-4. Shape — 가장 중요</h3>
+<ol>
+  <li><strong>Change shape</strong> 클릭</li>
+  <li>Shape series 탭에서 <strong>Specialty and previous generation</strong> 선택</li>
+  <li><strong><code>VM.Standard.E2.1.Micro</code></strong> 라디오 버튼 선택 (1 OCPU · 1 GB · <em>Always Free-eligible</em> 라벨 확인)</li>
+  <li><strong>Select shape</strong> 클릭</li>
+</ol>
+<img class="shot" src="images/week09/53_oracle_select_shape.png" alt="Browse all shapes — Specialty 탭 + VM.Standard.E2.1.Micro 선택">
+<p class="shot-cap">Specialty and previous generation → VM.Standard.E2.1.Micro (Always Free-eligible)</p>
+<div class="danger"><strong>다시 강조</strong> — Ampere(A1.Flex)는 Seoul/Chuncheon에서 capacity가 거의 항상 부족하다. 9주차는 <strong>E2.1.Micro 한 가지</strong>로 진행한다. AMD/Intel 탭의 E3/E4/E5.Flex는 유료.</div>
+
+<h3>3-5. Security</h3>
+<p>건드릴 것 없음. <strong>Shielded instance 토글 OFF</strong>(기본값) 그대로 두고 <strong>Next</strong>.</p>
+<img class="shot" src="images/week09/54_oracle_security.png" alt="Security 섹션 — Shielded instance OFF">
+<p class="shot-cap">Security: 기본값 그대로 통과</p>
+
+<h3>3-6. Networking</h3>
+<ul>
+  <li>Primary network: <strong>Create new virtual cloud network</strong></li>
+  <li>VCN name / Subnet name: 자동 생성된 이름 그대로 (예: <code>vcn-20260429-1700</code>)</li>
+  <li>Subnet: <strong>Create new public subnet</strong> (Private 아님)</li>
+  <li>CIDR block: 기본값 <code>10.0.0.0/24</code></li>
+  <li>Private IPv4 address: <strong>Automatically assign private IPv4 address</strong></li>
+  <li><strong>Public IPv4 address</strong>: ON (자동 할당)</li>
+</ul>
+<img class="shot" src="images/week09/55_oracle_networking_vnic.png" alt="Networking — Primary VNIC 설정 (Create new VCN)">
+<p class="shot-cap">Primary VNIC: Create new virtual cloud network</p>
+<img class="shot" src="images/week09/56_oracle_subnet_cidr.png" alt="Create new public subnet — CIDR 10.0.0.0/24">
+<p class="shot-cap">Public subnet 자동 생성 (CIDR 10.0.0.0/24)</p>
+<img class="shot" src="images/week09/57_oracle_private_ipv4.png" alt="Private IPv4 address — Automatically assign 선택">
+<p class="shot-cap">Private IPv4: Automatically assign</p>
+<p class="small">Public IP 토글이 안 켜지면 일단 OFF로 두고 진행 → STEP 4 하단의 "Public IP 수동 추가" 참조.</p>
+
+<h3>3-7. SSH Keys</h3>
+<ul>
+  <li><strong>Paste public key</strong> 라디오 버튼 선택</li>
+  <li>STEP 2에서 복사한 공개키 한 줄 붙여넣기 (<code>ssh-ed25519 AAAA...</code>로 시작)</li>
+</ul>
+<img class="shot" src="images/week09/58_oracle_ssh_paste.png" alt="Add SSH keys — Paste public key 입력">
+<p class="shot-cap">Paste public key → STEP 2 출력 한 줄 붙여넣기</p>
+
+<h3>3-8. Boot Volume (Storage)</h3>
+<ul>
+  <li><strong>Specify a custom boot volume size</strong> 토글 ON</li>
+  <li>Boot volume size: <strong>50</strong> GB (기본 권장. Always Free 한도 내에서 200까지 가능하지만 늘리기는 가능한데 줄이기가 불가능. 50GB로 만들자.)</li>
+  <li>VPU: <strong>10</strong> (Balanced, 기본값)</li>
+</ul>
+<img class="shot" src="images/week09/59_oracle_boot_volume.png" alt="Storage — Boot volume 50GB / VPU 10">
+<p class="shot-cap">Boot volume 50 GB · Balanced (3000 IOPS / 24 MB/s)</p>
+
+<h3>3-9. Create</h3>
+<p>화면 하단 <strong>Create</strong> 클릭. State가 <code>Provisioning</code> → 1~2분 뒤 <code>Running</code>으로 바뀐다.</p>
+<img class="shot" src="images/week09/60_oracle_provisioning.png" alt="Instances 목록 — aiweb2026-demo Provisioning 상태">
+<p class="shot-cap">생성 직후: Provisioning + Always Free 라벨</p>
+<img class="shot" src="images/week09/61_oracle_running_row.png" alt="aiweb2026-demo Running 상태로 전환">
+<p class="shot-cap">1~2분 뒤 Running으로 전환</p>
+
+<div class="ok"><strong>Running이 떴는가?</strong> 인스턴스 이름을 클릭해 상세 페이지의 <strong>Public IPv4 Address</strong>가 보이면 STEP 3 끝.</div>
+
+<!-- ============ STEP 4 ============ -->
+<h2 id="s4"><span class="step-num">4</span>Public IP 확인 + SSH 접속 테스트</h2>
+
+<h3>4-1. Public IP 메모</h3>
+<ol>
+  <li>Compute → Instances → 본인 인스턴스 클릭</li>
+  <li>상세 화면 <strong>Instance access</strong> 섹션의 <strong>Public IP address</strong> 값 옆 <strong>Copy</strong> 버튼 (예: <code>158.179.195.124</code>)</li>
+  <li>아래 <strong>Username</strong>은 <code>ubuntu</code>로 표시됨 — SSH 접속 시 이 사용자명으로 들어간다</li>
+</ol>
+<img class="shot" src="images/week09/62_oracle_instance_details.png" alt="인스턴스 상세 — Public IP address + Username 확인">
+<p class="shot-cap">Instance details → Instance access → Public IP address / Username</p>
+
+<h3>4-2. SSH 접속 (본인 노트북에서)</h3>
+<pre><code># macOS/Linux/WSL
+chmod 600 ~/.ssh/oracle_key
+ssh -i ~/.ssh/oracle_key ubuntu@&lt;PUBLIC_IP&gt;
+# 첫 접속 시 fingerprint → yes</code></pre>
+
+<p>프롬프트가 <code>ubuntu@instance-...:~$</code>로 바뀌고 <code>whoami</code> 결과가 <code>ubuntu</code>로 나오면 성공.</p>
+
+<h3>4-3. (Public IP 토글이 안 켜졌을 때만) 수동 추가</h3>
+<ol>
+  <li>인스턴스 상세 → 상단 <strong>Networking</strong> 탭</li>
+  <li><strong>Quick actions</strong> → <strong>Connect public subnet to internet</strong> → <strong>Connect</strong> 버튼</li>
+  <li>그래도 IP가 없으면: Networking 탭의 <strong>Attached VNICs</strong> → VNIC 클릭 → <strong>IP administration</strong> → Private IP 행 <strong>⋮</strong> → <strong>Edit</strong> → <strong>Public IP type: Ephemeral Public IP</strong> → <strong>Update</strong></li>
+</ol>
+
+<!-- ============ STEP 5 ============ -->
+<h2 id="s5"><span class="step-num">5</span>(권장) 예산 알림 설정 — 1분</h2>
+
+<p>Always Free 한도 안에서는 0원이지만, 실수로 유료 자원을 만들었을 때 즉시 메일이 오게 안전장치를 건다.</p>
+<ol>
+  <li>좌측 햄버거 메뉴 → <strong>Billing &amp; Cost Management → Budgets</strong></li>
+  <li><strong>Create Budget</strong></li>
+  <li>Target type: <strong>Compartment</strong> → 루트 compartment 선택</li>
+  <li>Budget amount: <strong>1</strong> (USD)</li>
+  <li>Alert rule: <strong>Forecast / Actual = 50%</strong> → 본인 이메일 입력</li>
+  <li>Save</li>
+</ol>
+<img class="shot" src="images/week09/63_oracle_budget_menu.png" alt="Billing &amp; Cost Management → Budgets 메뉴">
+<p class="shot-cap">햄버거 메뉴 → Billing &amp; Cost Management → Budgets</p>
+
+<!-- ============ STEP 6 ============ -->
+<h2 id="s6"><span class="step-num">6</span>Public IP 분배 시트 제출</h2>
+
+<p>강사가 공유한 <a href="https://docs.google.com/spreadsheets/d/1pDMyc5JPKs-61l5W0Vujw99z-HetFYmMjtWVj03ZiD4/edit?usp=sharing" target="_blank"><strong>Public IP 분배 시트</strong></a>에 본인 행을 채운다.</p>
+<p class="small">강사가 제출된 IP를 일괄로 Cloudflare DNS A 레코드(<code>&lt;id&gt;-demo.aiweb2026.site</code>)로 등록한다. 학생은 시트 제출까지만.</p>
+<p><a href="https://docs.google.com/spreadsheets/d/1pDMyc5JPKs-61l5W0Vujw99z-HetFYmMjtWVj03ZiD4/edit?usp=sharing" target="_blank">📋 분배 시트 열기 →</a></p>
+
+<!-- ============ STEP 7 ============ -->
+<h2 id="s7"><span class="step-num">7</span>완료 체크리스트</h2>
+
+<ul class="checks">
+  <li>Oracle Cloud 계정 생성 + 홈 리전 한국으로 설정</li>
+  <li>SSH 키 한 쌍 본인 PC에 보관 (<code>~/.ssh/oracle_key</code>, <code>oracle_key.pub</code>)</li>
+  <li>인스턴스 상태 <strong>RUNNING</strong> + Shape <code>VM.Standard.E2.1.Micro</code></li>
+  <li>Public IPv4 Address 발급됨</li>
+  <li>본인 노트북에서 <code>ssh -i ... ubuntu@&lt;IP&gt;</code> 접속 성공</li>
+  <li>예산 알림($1) 등록 (권장)</li>
+  <li><a href="https://docs.google.com/spreadsheets/d/1pDMyc5JPKs-61l5W0Vujw99z-HetFYmMjtWVj03ZiD4/edit?usp=sharing" target="_blank">분배 시트</a>에 본인 ID + Public IP 제출</li>
+</ul>
+
+
+</div>
+</body>
+</html>
