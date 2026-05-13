@@ -45,7 +45,7 @@ jobs:
       - name: 3. HuggingFace Space로 push
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USER: your-hf-username           # ← 본인 HF username으로 교체
+          HF_USER: heetae0828           # ← 본인 HF username으로 교체
           HF_SPACE: walrus-study        # ← 본인 HF Space 이름으로 교체 (예: walrus-study)
         run: |
           set -e
