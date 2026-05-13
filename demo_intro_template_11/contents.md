@@ -67,8 +67,10 @@
 ## 기술 스택
 
 - **UI**: Gradio
-- **모델 / API**: OpenAI GPT-4o-mini
+- **모델 / API**: OpenAI GPT-4o-mini (OpenAI API, `OPENAI_API_KEY` 환경변수 사용)
 - **외부 서비스**: 없음 (또는 로컬/간단 파일 저장으로 구현)
+
+> 주의: API 키는 `.env` 같은 환경 변수 파일에만 저장하고, 깃 커밋이나 공개 저장소에는 절대 업로드하지 않는다.
 
 ---
 

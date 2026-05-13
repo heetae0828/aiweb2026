@@ -1,0 +1,10 @@
+.env
+.DS_Store
+
+# Local Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Local application state
+history.json

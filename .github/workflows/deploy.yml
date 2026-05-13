@@ -1,0 +1,32 @@
+name: Deploy to Oracle Server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Oracle server via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: REPO_URL
+          script: |
+            set -e
+            cd /home/ubuntu/calorie
+            if [ ! -d .git ]; then
+              git init
+              git remote add origin "$REPO_URL"
+            fi
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose up -d --build

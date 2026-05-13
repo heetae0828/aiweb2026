@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10주차 — 칼로리카운터 Oracle 배포 + GitHub Actions CI/CD</title>
+<style>
+  :root {
+    --accent:#f97316; --accent2:#0ea5e9; --ink:#1a1a2e;
+    --green:#047857; --red:#ef4444; --bg:#f8fafc; --paper:#ffffff;
+    --line:#e5e7eb; --muted:#6b7280;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Segoe UI','Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+    line-height:1.65; font-size:16px;
+  }
+  .layout { display:grid; grid-template-columns:260px minmax(0,1fr); max-width:1280px; margin:0 auto; }
+  aside.toc {
+    position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+    padding:1.4rem 1rem; border-right:1px solid var(--line); background:var(--paper);
+    font-size:0.85rem;
+  }
+  aside.toc .toc-title { font-weight:800; color:var(--accent); margin-bottom:0.6rem;
+    letter-spacing:0.04em; font-size:0.78rem; text-transform:uppercase; }
+  aside.toc ol { list-style:none; padding:0; margin:0; }
+  aside.toc li { margin:0.25rem 0; }
+  aside.toc a { color:#334155; text-decoration:none; display:block;
+    padding:0.35rem 0.5rem; border-radius:6px; border-left:3px solid transparent; }
+  aside.toc a:hover { background:#f1f5f9; color:var(--accent); border-left-color:var(--accent); }
+  aside.toc .stage-label { display:inline-block; background:var(--accent); color:white;
+    padding:0.05rem 0.45rem; border-radius:4px; font-size:0.7rem;
+    font-weight:700; margin-right:0.35rem; vertical-align:middle; }
+  aside.toc .stage-label.s2 { background:var(--accent2); }
+  main.content { padding:2rem 2.4rem 4rem; max-width:920px; }
+  main.content article {
+    background:var(--paper); border:1px solid var(--line); border-radius:14px;
+    padding:1.6rem 1.9rem; margin-bottom:1.4rem;
+    box-shadow:0 1px 3px rgba(15,23,42,0.04);
+  }
+  h1, h2, h3, h4 { color:var(--ink); font-weight:700; letter-spacing:-0.01em; margin-top:0; }
+  h1 { font-size:1.85rem; }
+  h2 { font-size:1.35rem; margin-top:0; padding-top:0; border:none; }
+  h3 { font-size:1.05rem; color:var(--green); margin:1.1em 0 0.5em; }
+  h4 { font-size:0.95rem; color:var(--green); margin:0.8em 0 0.3em; }
+  p, ul, ol, li { font-size:0.95rem; }
+  ul, ol { padding-left:1.4rem; }
+  a { color:var(--accent2); }
+  code { background:#f1f5f9; color:#be123c; padding:0.1em 0.4em;
+    border-radius:4px; font-family:Menlo,Monaco,monospace; font-size:0.88em; }
+  pre { background:#1e293b; color:#e2e8f0; padding:0.9em 1.1em;
+    border-radius:8px; overflow-x:auto; font-size:0.84rem; line-height:1.55;
+    font-family:Menlo,Monaco,monospace; margin:0.5em 0; }
+  pre code { background:transparent; color:inherit; padding:0; font-size:1em; }
+  table { border-collapse:collapse; width:100%; margin:0.6em 0; font-size:0.9rem; }
+  th, td { border:1px solid var(--line); padding:0.55em 0.7em; vertical-align:top; text-align:left; }
+  th { background:#fef3c7; }
+  /* main.content article.hero — 일반 article 규칙(0,1,2)보다 높은 (0,2,2) specificity */
+  main.content article.hero {
+    background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);
+    color:white; border:none; border-radius:18px;
+    padding:2.2rem 2rem; margin-bottom:1.4rem;
+  }
+  main.content article.hero .badge {
+    display:inline-block; background:rgba(255,255,255,0.22);
+    color:white;
+    padding:0.25rem 0.85rem; border-radius:999px; font-size:0.72rem;
+    letter-spacing:0.13em; font-weight:700;
+  }
+  main.content article.hero h1 { color:white; margin:0.6rem 0 0.4rem; }
+  main.content article.hero p { color:white; font-size:1rem; opacity:0.95; margin:0; }
+  main.content article.hero code { background:rgba(255,255,255,0.25); color:#fffbe9; }
+  .stage-banner {
+    display:flex; align-items:center; gap:0.9rem;
+    background:#fff7ed; border:2px solid var(--accent); border-radius:12px;
+    padding:1rem 1.3rem; margin:1.6rem 0 1.2rem;
+  }
+  .stage-banner.s2 { background:#ecfeff; border-color:var(--accent2); }
+  .stage-banner .num {
+    background:var(--accent); color:white; width:42px; height:42px;
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:1.1rem; flex-shrink:0;
+  }
+  .stage-banner.s2 .num { background:var(--accent2); }
+  .stage-banner h2 { border:none; padding:0; margin:0; font-size:1.15rem; }
+  .stage-banner p { margin:0.15rem 0 0; font-size:0.88rem; color:var(--muted); }
+  .danger {
+    background:#fef2f2; border-left:4px solid var(--red);
+    padding:0.7em 1em; border-radius:6px; margin:0.8em 0; font-size:0.92rem;
+  }
+  .danger strong { color:var(--red); }
+  .why {
+    background:#fff7ed; border-left:4px solid var(--accent);
+    padding:0.7em 1em; border-radius:6px; margin:0.8em 0; font-size:0.92rem;
+  }
+  .ok {
+    background:#ecfdf5; border-left:4px solid var(--green);
+    padding:0.7em 1em; border-radius:6px; margin:0.8em 0; font-size:0.92rem;
+  }
+  .checkpoint {
+    background:#f0f9ff; border:1.5px dashed var(--accent2); border-radius:8px;
+    padding:0.7em 1em; margin:1em 0 0.5em; font-size:0.92rem;
+  }
+  .checkpoint strong { color:var(--accent2); }
+  .step-num {
+    display:inline-block; width:30px; height:30px; border-radius:50%;
+    background:var(--accent); color:white; text-align:center;
+    font-weight:700; line-height:30px; margin-right:0.5rem; font-size:0.9rem;
+    vertical-align:middle;
+  }
+  .step-num.s2 { background:var(--accent2); }
+  .breadcrumb {
+    display:inline-block; background:#f1f5f9; border:1px solid var(--line);
+    border-radius:6px; padding:0.35em 0.7em; font-size:0.85rem; margin:0.4em 0;
+    font-family:Menlo,Monaco,monospace;
+  }
+  .breadcrumb .arr { color:var(--muted); margin:0 0.35em; }
+  .breadcrumb .now { color:var(--accent); font-weight:700; }
+  .shot { width:100%; max-width:780px; border:1px solid var(--line);
+    border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.06);
+    display:block; margin:0.6rem auto; background:#fff; }
+  .shot-cap { font-size:0.78rem; color:var(--muted); text-align:center; margin:0.2rem 0 1rem; }
+  .small { font-size:0.82rem; color:var(--muted); }
+  .arch {
+    background:#0f172a; color:#a5f3fc; border-radius:10px;
+    padding:1em 1.2em; font-family:Menlo,monospace; font-size:0.78rem;
+    line-height:1.55; white-space:pre; overflow-x:auto; margin:0.8em 0;
+  }
+  .quick-list { background:#fffbeb; border:1px solid #fde68a; border-radius:10px;
+    padding:0.9em 1.2em; margin:0.6em 0; }
+  .quick-list ol { margin:0.3em 0 0; padding-left:1.4em; }
+  .quick-list li { margin:0.25em 0; font-size:0.93rem; }
+  @media (max-width:900px) {
+    .layout { grid-template-columns:1fr; }
+    aside.toc { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+    main.content { padding:1.4rem 1.1rem 3rem; }
+    main.content article { padding:1.2rem 1.1rem; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<aside class="toc">
+  <div class="toc-title">10주차 차례</div>
+  <ol>
+    <li><a href="#overview">전체 흐름 + 사전 준비</a></li>
+    <li><a href="#s1"><span class="stage-label">S1</span>시트에 본인 IP 입력</a></li>
+    <li><a href="#s2"><span class="stage-label">S1</span>Oracle 서버 사전 세팅</a></li>
+    <li><a href="#s3"><span class="stage-label">S1</span>Docker + 칼로리카운터</a></li>
+    <li><a href="#s4"><span class="stage-label">S1</span>nginx + 도메인 검증</a></li>
+    <li><a href="#s5"><span class="stage-label s2">S2</span>GitHub 리포 + Secret</a></li>
+    <li><a href="#s6"><span class="stage-label s2">S2</span>첫 자동 배포 검증</a></li>
+    <li><a href="#s7">9주차 Live Demo 살리기</a></li>
+    <li><a href="#s8">자주 막히는 함정</a></li>
+    <li><a href="#wrap">학기 종료 후</a></li>
+  </ol>
+</aside>
+
+<main class="content">
+
+<article class="hero">
+  <span class="badge">10주차 · 2026 AI웹융합</span>
+  <h1>칼로리카운터 Oracle 배포 + GitHub Actions CI/CD</h1>
+  <p>본인 칼로리카운터를 Oracle E2.1.Micro에 Docker로 띄우고, <code>git push</code> 한 번으로 자동 배포되는 CI/CD까지 만든다. 9주차 페이지의 "Live Demo" 버튼을 본인 데모로 연결하면 끝.</p>
+</article>
+
+<article id="overview">
+  <h2>전체 흐름</h2>
+  <p>오늘 작업은 두 단계로 나뉜다. <strong>STAGE 1을 먼저 끝낸 다음 STAGE 2로 넘어간다.</strong> 1을 건너뛰면 2가 디버깅 불가능.</p>
+
+  <table>
+    <tr><th>단계</th><th>하는 일</th><th>끝나는 시점의 결과</th></tr>
+    <tr>
+      <td><strong>STAGE 1</strong><br>수동 배포</td>
+      <td>zip 업로드 → Docker 기동 → nginx → 시트 입력</td>
+      <td><code>https://&lt;ID&gt;-demo.aiweb2026.site</code> 접속 가능</td>
+    </tr>
+    <tr>
+      <td><strong>STAGE 2</strong><br>자동화</td>
+      <td>GitHub 리포 + Secret 4개 → push 한 번</td>
+      <td>코드 수정 후 push만 하면 30초 내 사이트 갱신</td>
+    </tr>
+  </table>
+
+  <h3>오늘 만들 그림</h3>
+  <div class="arch">사용자 브라우저
+  │  https://&lt;본인ID&gt;-demo.aiweb2026.site
+  ▼
+Cloudflare Universal SSL + Worker (강사 인프라)
+  │  시트 D 컬럼(Public IP)으로 라우팅
+  ▼  http
+본인 Oracle E2.1.Micro · 80번 (nginx)
+  ▼  http
+본인 Docker 컨테이너 · 7860번 (Gradio)
+</div>
+  <p class="small">본인이 손볼 곳은 <strong>Oracle 서버(80→7860)</strong>와 <strong>분배 시트의 본인 행</strong> 두 군데. HTTPS 인증서·DNS·Worker는 강사가 관리한다.</p>
+
+  <h3>실습 전 손에 있어야 하는 것</h3>
+  <div class="quick-list">
+    <ol>
+      <li>9주차 숙제 — 본인 OCI 인스턴스 RUNNING + Public IP 확보</li>
+      <li>9주차에 받은 SSH 키 파일 (<code>~/.ssh/oracle_key</code>)</li>
+      <li>본인 Hugging Face 토큰 (<code>hf_</code>로 시작, Read 권한) — 6주차에 발급받은 그대로</li>
+      <li>e-class에서 받은 <code>week10_calorie.zip</code></li>
+      <li>본인 GitHub 계정 (9주차에 만든 그대로)</li>
+      <li><a href="https://docs.google.com/spreadsheets/d/1pDMyc5JPKs-61l5W0Vujw99z-HetFYmMjtWVj03ZiD4/edit?usp=sharing" target="_blank" rel="noopener">분배 시트</a> 본인 행 위치 (강사 공유)</li>
+    </ol>
+  </div>
+  <div class="danger">
+    <strong>OCI 가입 못 한 학생</strong> — 시트 본인 행에 강사가 안내하는 공유 IP를 일단 입력. 이후 본인 가입 완료되면 D 컬럼만 본인 IP로 갱신하면 5분 내 자동 반영.
+  </div>
+</article>
+
+
+<!-- ==================== STAGE 1 ==================== -->
+<div class="stage-banner">
+  <div class="num">1</div>
+  <div>
+    <h2>STAGE 1 — 수동으로 한 번 띄워 본다</h2>
+    <p>zip을 직접 올려서 본인 도메인이 작동하는 것을 먼저 확인한다.</p>
+  </div>
+</div>
+
+
+<article id="s1">
+  <h2><span class="step-num">1</span>시트에 본인 Public IP 입력</h2>
+
+  <p><a href="https://docs.google.com/spreadsheets/d/1pDMyc5JPKs-61l5W0Vujw99z-HetFYmMjtWVj03ZiD4/edit?usp=sharing" target="_blank" rel="noopener"><strong>분배 시트 열기 →</strong></a> 본인 행에서 <strong>D 컬럼</strong>에 본인 Oracle Public IP를 입력한다. IP만 적는다 — <code>http://</code>나 포트 번호를 같이 적으면 라우팅이 깨진다.</p>
+
+  <table>
+    <tr><th>컬럼</th><th>의미</th><th>예시</th></tr>
+    <tr><td>A: 이름</td><td>본인 식별</td><td>김아무개</td></tr>
+    <tr><td>B: Domain</td><td>본인 서브도메인</td><td><code>s01.aiweb2026.site</code></td></tr>
+    <tr><td>C: Page Link</td><td>9주차 소개 페이지 URL</td><td><code>s01-portfolio.pages.dev</code></td></tr>
+    <tr><td>D: <strong>Public IP</strong></td><td>Oracle 데모 서버 IP (오늘 입력)</td><td><code>168.110.127.64</code></td></tr>
+  </table>
+
+  <div class="why">
+    <strong>왜 시트에 입력하나.</strong> 강사 Cloudflare Worker가 <code>*.aiweb2026.site</code> 트래픽을 받아서 시트의 매핑을 5분 캐시로 조회한다. 한 행이 두 도메인으로 풀린다. <code>s01.aiweb2026.site</code>는 9주차 소개 페이지(C)로, <code>s01-demo.aiweb2026.site</code>는 본인 Oracle origin(D)로 자동 라우팅.
+  </div>
+
+  <div class="checkpoint">
+    <strong>체크포인트.</strong> 시트 본인 행 D 컬럼에 IP가 들어가 있다. 다른 컬럼은 건드리지 않는다.
+  </div>
+</article>
+
+
+<article id="s2">
+  <h2><span class="step-num">2</span>Oracle 서버 사전 세팅 (swap + 방화벽 + nginx)</h2>
+
+  <p>본인 인스턴스에 SSH 접속 후 다섯 가지 사전 작업을 한다. swap 추가 → iptables 80/443 ALLOW → OCI Security List 80/443 ingress → nginx 기본 설치 → 외부 도달 검증.</p>
+
+  <div class="why">
+    <strong>왜 nginx를 Docker보다 먼저 까나.</strong> 80번 외부 도달 검증을 실제로 끝내려면 80번에 무언가가 응답해야 한다. nginx 기본 welcome 페이지가 가장 단순한 응답기. 이 상태로 "방화벽 두 layer + 80번 도달"을 먼저 통과시키고 다음 단계에서 Docker 컨테이너를 올린 뒤, 마지막에 nginx 설정만 calorie-counter용으로 교체한다. 거꾸로 하면 (Docker만 먼저 띄우고 80번 검증) 컨테이너가 죽었는지 방화벽이 막혔는지 분리 진단이 어렵다.
+  </div>
+
+  <h3>2-1. SSH 접속</h3>
+
+<pre><code># 본인 PC 터미널에서 (PowerShell, macOS Terminal, Linux 다 동일)
+ssh -i ~/.ssh/oracle_key ubuntu@&lt;본인_Public_IP&gt;
+
+# Windows에서 키 경로가 다르면:
+ssh -i C:\Users\&lt;이름&gt;\.ssh\oracle_key ubuntu@&lt;본인_Public_IP&gt;</code></pre>
+
+  <div class="danger">
+    <strong>접속 안 됨</strong>
+    <ul>
+      <li><code>Permissions 0644 ... too open</code> → <code>chmod 600 ~/.ssh/oracle_key</code> 후 재시도</li>
+      <li><code>Connection refused</code> → OCI Console에서 인스턴스 RUNNING 확인. STOPPED면 Start</li>
+      <li><code>Connection timed out</code> → Security List 22번 막힘 (보통 9주차에 풀어둔 상태)</li>
+    </ul>
+  </div>
+
+  <h3>2-2. swap 2GB 설정 (1GB RAM 보강)</h3>
+
+<pre><code># Oracle 서버에서
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# 검증 — Swap 줄이 2.0Gi로 나와야 정상
+free -h</code></pre>
+
+  <div class="why">
+    <strong>왜 swap을 만드나.</strong> Always Free E2.1.Micro는 RAM 1GB. Docker 첫 빌드 때 <code>pip install</code>이 메모리를 다 잡아먹어 OOM(Out Of Memory)으로 죽는다. swap 2GB가 있으면 빌드가 끝까지 간다.
+  </div>
+
+  <h3>2-3. iptables 80/443 ALLOW (REJECT 위에 끼워넣기)</h3>
+
+  <p>OCI Ubuntu의 iptables INPUT 체인 마지막 즈음에 <code>REJECT all -- ... reject-with icmp-host-prohibited</code>가 박혀 있다. ALLOW를 그 뒤에 붙이면 위쪽 REJECT가 먼저 매칭되어 막힌다. <strong>REJECT 줄 바로 위 자리에 INSERT</strong>해야 한다.</p>
+
+<pre><code># 현재 룰 확인 (REJECT 라인 번호 파악)
+sudo iptables -L INPUT --line-numbers
+
+# 출력 예 (라인 번호는 본인 환경 기준):
+# 1    ACCEPT  ... state RELATED,ESTABLISHED
+# 2    ACCEPT  ... icmp
+# 3    ACCEPT  ... lo
+# 4    ACCEPT  ... state NEW tcp dpt:22
+# 5    REJECT  all -- ... reject-with icmp-host-prohibited
+
+# REJECT가 5번이면 그 자리(5)에 INSERT — 기존 5번은 6번으로 밀림
+sudo iptables -I INPUT 5 -p tcp --dport 80  -j ACCEPT
+sudo iptables -I INPUT 5 -p tcp --dport 443 -j ACCEPT
+
+# 영구 저장 (재부팅 시 유지)
+sudo apt install -y iptables-persistent
+sudo netfilter-persistent save
+
+# 다시 확인 — 80/443 ACCEPT가 REJECT 위에 보여야 정상
+sudo iptables -L INPUT --line-numbers | head -10</code></pre>
+
+  <div class="danger">
+    <strong>잘못 넣었을 때 되돌리기.</strong> <code>-I</code> 대신 <code>-A</code>로 추가했거나 라인 번호를 잘못 줘서 ALLOW가 REJECT 아래에 들어간 경우, 해당 룰만 골라서 지우고 다시 INSERT한다.
+<pre><code># 현재 룰 + 라인 번호 다시 확인
+sudo iptables -L INPUT --line-numbers
+
+# 잘못 들어간 줄을 라인 번호로 삭제 (예: 80번이 7번 라인에 있다면)
+sudo iptables -D INPUT 7
+
+# 또는 룰 내용으로 직접 삭제 (라인 번호 셀 필요 없음)
+sudo iptables -D INPUT -p tcp --dport 80  -j ACCEPT
+sudo iptables -D INPUT -p tcp --dport 443 -j ACCEPT
+
+# 삭제 후 § 2-3 절차로 REJECT 위 자리에 다시 INSERT
+# 마지막에 영구 저장 다시 한 번
+sudo netfilter-persistent save</code></pre>
+    <code>-D</code>는 delete. 라인 번호로 지우면 한 줄 지울 때마다 아래 번호가 한 칸씩 당겨지니, 여러 줄 지울 땐 <strong>아래쪽부터</strong> 지우거나 매번 <code>-L --line-numbers</code>로 다시 확인.
+  </div>
+
+  <h3>2-4. OCI Console — Security List에 80/443 ingress 추가</h3>
+
+  <p>iptables가 풀려도 OCI 가상 네트워크(VCN) Security List가 막혀있으면 외부에서 안 닿는다. 두 layer 모두 풀어줘야 외부에서 접속 가능.</p>
+
+  <h4>① 인스턴스 → Networking 탭 → Subnet 링크 클릭</h4>
+
+  <div class="breadcrumb">
+    cloud.oracle.com <span class="arr">›</span> Compute <span class="arr">›</span> Instances
+    <span class="arr">›</span> 본인 인스턴스 <span class="arr">›</span> <span class="now">Networking 탭</span>
+  </div>
+
+  <img class="shot" src="images/week10/oci_step1_networking_tab.png" alt="OCI 인스턴스 상세 페이지의 Networking 탭 — Primary VNIC 섹션의 Subnet 하이퍼링크 위치">
+  <p class="shot-cap">인스턴스 상세 페이지에서 <strong>Networking 탭</strong> 클릭 → 하단 <strong>Subnet</strong> 줄의 파란색 링크(<code>public subnet-vcn-main</code> 등) 클릭</p>
+
+  <h4>② Subnet → Security 탭 → Default Security List 클릭</h4>
+
+  <div class="breadcrumb">
+    Subnet <span class="arr">›</span> <span class="now">Security 탭</span>
+    <span class="arr">›</span> Security Lists
+  </div>
+
+  <img class="shot" src="images/week10/oci_step2_subnet_security.png" alt="public subnet-vcn-main 페이지의 Security 탭 — Default Security List for vcn-main 링크 위치">
+  <p class="shot-cap">Subnet 페이지에서 상단 <strong>Security</strong> 탭 → 하단 표의 <strong>Default Security List for vcn-main</strong> 링크 클릭</p>
+
+  <h4>③ Default Security List → Add Ingress Rules 버튼 클릭</h4>
+
+  <div class="breadcrumb">
+    Default Security List <span class="arr">›</span> Security rules
+    <span class="arr">›</span> <span class="now">Add Ingress Rules 버튼</span>
+  </div>
+
+  <img class="shot" src="images/week10/oci_step3_add_ingress_button.png" alt="Default Security List for vcn-main 페이지의 Ingress Rules 표 — Add Ingress Rules 버튼 위치">
+  <p class="shot-cap">기본 등록된 Ingress 룰(SSH 22, ICMP 등)이 보이는 표 위쪽의 <strong>Add Ingress Rules</strong> 버튼 클릭. 표 안에 <code>80</code>·<code>443</code> 룰이 이미 있으면 추가할 필요 없음 — 다음 단계 건너뛰기.</p>
+
+  <h4>④ Add Ingress Rules 폼에 80번·443번 한 번에 등록</h4>
+
+  <div class="breadcrumb">
+    Add Ingress Rules <span class="arr">›</span> Ingress Rule 1 (포트 80)
+    <span class="arr">›</span> <span class="now">+ Another Ingress Rule</span> <span class="arr">›</span> Ingress Rule 2 (포트 443)
+  </div>
+
+  <img class="shot" src="images/week10/oci_step4_add_ingress_form.png" alt="Add Ingress Rules 폼 — Ingress Rule 1에 포트 80, Ingress Rule 2에 포트 443 입력한 화면">
+  <p class="shot-cap">우하단 <strong>+ Another Ingress Rule</strong> 버튼을 한 번 눌러 룰 두 개를 한 화면에 만들고, 각각 80과 443을 입력한 뒤 맨 아래 <strong>Add Ingress Rules</strong>로 저장</p>
+
+  <p>각 룰에 입력할 값:</p>
+  <table>
+    <tr><th>필드</th><th>값</th></tr>
+    <tr><td>Stateless</td><td>체크 안 함</td></tr>
+    <tr><td>Source Type</td><td><code>CIDR</code></td></tr>
+    <tr><td>Source CIDR</td><td><code>0.0.0.0/0</code></td></tr>
+    <tr><td>IP Protocol</td><td><code>TCP</code></td></tr>
+    <tr><td>Destination Port Range</td><td>Ingress Rule 1은 <strong>80</strong>, Ingress Rule 2는 <strong>443</strong></td></tr>
+  </table>
+
+  <p>저장 후 Security rules 표로 돌아가서 <strong>TCP 80</strong>과 <strong>TCP 443</strong> 두 줄이 추가된 것을 확인한다.</p>
+
+  <h3>2-5. nginx 기본 설치 (80번에 응답기 두기)</h3>
+
+<pre><code># Oracle 서버 SSH 세션에서
+sudo apt update
+sudo apt install -y nginx
+
+# 자동으로 service 기동됨 — 상태 확인
+sudo systemctl status nginx --no-pager | head -5
+# active (running) 줄이 보여야 정상
+
+# 서버 자기 자신에게 nginx default 응답 확인
+curl -I http://127.0.0.1
+# HTTP/1.1 200 OK
+# Server: nginx/...</code></pre>
+
+  <p class="small">지금은 nginx 기본 welcome 페이지만 떠있는 상태. 칼로리카운터용 reverse proxy 설정은 § 4에서 Docker 컨테이너가 7860에 떠있는 걸 확인한 뒤에 교체한다.</p>
+
+  <h3>2-6. 검증 — 본인 PC에서 80번 도달 + 브라우저 확인</h3>
+
+  <p>방화벽 두 layer(iptables + OCI Security List)가 모두 풀려야 본인 PC에서 서버 80번까지 도달한다. nginx가 떠있으니 응답까지 확인 가능.</p>
+
+<pre><code># 본인 PC 터미널에서 (서버 SSH 세션 아님)
+
+# Windows PowerShell
+Test-NetConnection -ComputerName &lt;본인_Public_IP&gt; -Port 80
+
+# macOS / Linux
+nc -zv &lt;본인_Public_IP&gt; 80</code></pre>
+
+  <p>그 다음 본인 PC 브라우저에서 <code>http://&lt;본인_Public_IP&gt;</code>로 접속 → <strong>"Welcome to nginx!"</strong> 페이지가 떠야 한다.</p>
+
+  <div class="checkpoint">
+    <strong>체크포인트.</strong> ① 터미널에서 <code>TcpTestSucceeded : True</code> (Windows) 또는 <code>Connection succeeded</code> (macOS/Linux). ② 브라우저에서 nginx welcome 페이지 표시. 둘 중 하나라도 실패면:
+    <ul style="margin:0.3em 0 0;padding-left:1.3em;">
+      <li>Connection refused → 서버에서 <code>sudo systemctl status nginx</code> 다시 확인</li>
+      <li>Connection timed out → § 2-3 iptables와 § 2-4 Security List 다시 확인</li>
+    </ul>
+  </div>
+</article>
+
+
+<article id="s3">
+  <h2><span class="step-num">3</span>Docker 설치 + 칼로리카운터 zip 배포</h2>
+
+  <h3>3-1. Docker 설치 — <strong>Oracle 서버에 설치한다 (본인 PC 아님)</strong></h3>
+
+  <div class="danger">
+    <strong>어디서 실행하는지 헷갈리지 말 것.</strong> 이 단계의 모든 명령은 <strong>Oracle 서버에 SSH로 접속한 상태</strong>에서 실행한다. 본인 PC에 Docker Desktop을 깔라는 게 아니다. 본인 PC에는 아무것도 설치할 필요 없다.<br>
+    터미널 프롬프트가 <code>ubuntu@&lt;본인_Public_IP&gt;:~$</code> 형태면 서버 안. <code>%</code>나 <code>PS&gt;</code> 형태면 본인 PC — 다시 <code>ssh -i ~/.ssh/oracle_key ubuntu@&lt;본인_Public_IP&gt;</code>로 들어간다.
+  </div>
+
+<pre><code># Oracle 서버 SSH 세션 안에서만 실행
+# (프롬프트가 ubuntu@... 인지 다시 한 번 확인)
+
+# Docker 공식 설치 스크립트
+curl -fsSL https://get.docker.com | sudo sh
+
+# ubuntu 사용자가 sudo 없이 docker 명령 쓸 수 있게
+sudo usermod -aG docker $USER
+
+# 그룹 즉시 적용 (재로그인 안 해도 됨)
+newgrp docker
+
+# 검증
+docker --version
+docker compose version</code></pre>
+
+  <div class="why">
+    <strong>왜 본인 PC가 아니라 서버에 까나.</strong> 칼로리카운터는 학기 끝나도 24시간 서비스 중인 사이트가 되어야 한다. 본인 PC에 띄우면 PC 끄는 순간 사이트도 죽는다. 그래서 항상 켜져 있는 Oracle 서버에 컨테이너를 둔다. 본인 PC는 코드만 짜고 <code>git push</code>만 하면 끝 — Docker는 서버에서만 돈다.
+  </div>
+
+  <h3>3-2. zip 업로드 — <strong>본인 PC에서 실행</strong></h3>
+
+  <p>e-class에서 <code>week10_calorie.zip</code>을 본인 PC로 다운로드 후, 본인 PC 터미널에서 Oracle 서버로 업로드한다. 여기는 <strong>서버 SSH 세션이 아니라 본인 PC 터미널</strong>. 새 터미널 창을 하나 더 열어 PC용 작업을 한다.</p>
+
+<pre><code># 본인 PC에서 (서버 SSH 세션이 아니라 본인 PC 터미널)
+
+# macOS / Linux
+scp -i ~/.ssh/oracle_key ~/Downloads/week10_calorie.zip ubuntu@&lt;본인_Public_IP&gt;:~/
+
+# Windows PowerShell
+scp -i $env:USERPROFILE\.ssh\oracle_key `
+    $env:USERPROFILE\Downloads\week10_calorie.zip `
+    ubuntu@&lt;본인_Public_IP&gt;:~/</code></pre>
+
+  <h3>3-3. 압축 풀기 — <strong>다시 Oracle 서버에서</strong></h3>
+
+  <p>이 단계부터 다시 <strong>서버 SSH 세션</strong>으로 돌아온다. 프롬프트가 <code>ubuntu@...</code>인지 확인.</p>
+
+<pre><code># Oracle 서버 SSH 세션 안에서 실행
+
+# OCI Ubuntu 22.04 cloud image에는 unzip이 기본 미포함 — 1회 설치
+sudo apt install -y unzip
+
+unzip ~/week10_calorie.zip -d ~/calorie
+cd ~/calorie
+
+# 구조 확인 — 이런 파일들이 보여야 정상
+ls -la
+# README.md, app.py, model_config.py, requirements.txt
+# Dockerfile, docker-compose.yml, .env.example
+# nginx-calorie.conf, .gitignore
+# .github/workflows/deploy.yml</code></pre>
+
+  <h3>3-4. <code>.env</code> 작성 — HF_TOKEN 입력</h3>
+
+  <div class="why">
+    <strong>vi 최소 사용법.</strong> 이번 수업에서 텍스트 편집은 <code>vi</code>로 한다.
+    <ul style="margin:0.3em 0 0;padding-left:1.3em;">
+      <li>편집 시작: <code>i</code> 키 누르면 좌하단에 <code>-- INSERT --</code> 표시</li>
+      <li>편집 종료: <code>Esc</code> 키 (insert 모드 빠져나옴)</li>
+      <li>저장 + 종료: <code>:wq</code> 입력 후 Enter</li>
+      <li>저장 안 하고 종료: <code>:q!</code> 입력 후 Enter</li>
+    </ul>
+  </div>
+
+<pre><code>cd ~/calorie
+cp .env.example .env
+vi .env</code></pre>
+
+  <p><code>.env</code> 파일 내용을 다음 한 줄로 만든다 (따옴표 없이). <code>i</code> 누르고 입력 → <code>Esc</code> → <code>:wq</code>:</p>
+
+<pre><code>HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxx</code></pre>
+
+  <p>9주차에 발급받은 본인 Hugging Face Read 토큰 그대로. 새로 발급할 필요 없다. 토큰이 없거나 잃어버린 학생은 <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a>에서 새로 발급(<strong>Create new token</strong> → <strong>Read</strong> 권한 선택).</p>
+
+<pre><code># 비밀값이니 권한 600 (소유자만 읽기·쓰기)
+chmod 600 .env
+ls -la .env
+# -rw------- 1 ubuntu ubuntu ... .env</code></pre>
+
+  <div class="danger">
+    <strong>HF_TOKEN은 절대 GitHub에 push 금지.</strong> zip에 동봉된 <code>.gitignore</code>에 <code>.env</code>가 차단되어 있지만, 직접 GitHub에 올릴 때 한 번 더 <code>cat .gitignore | grep .env</code>로 확인.
+  </div>
+
+  <h3>3-5. 첫 컨테이너 기동 (3~5분)</h3>
+
+<pre><code>cd ~/calorie
+docker compose up -d --build</code></pre>
+
+  <p>첫 빌드는 베이스 이미지 다운로드 + pip install로 몇 분 걸린다. 두 번째부터는 캐시 덕분에 훨씬 빠르다.</p>
+
+  <h3>3-6. 작동 확인</h3>
+
+<pre><code># 컨테이너 상태
+docker compose ps
+# NAME             STATUS         PORTS
+# calorie-counter  Up 30 seconds  0.0.0.0:7860-&gt;7860/tcp
+
+# 실시간 로그
+docker compose logs -f
+# "Running on local URL: http://0.0.0.0:7860" 보이면 OK
+# Ctrl+C로 빠져나옴
+
+# 서버 자기 자신에게 응답 확인
+curl -I http://127.0.0.1:7860
+# HTTP/1.1 200 OK</code></pre>
+
+  <div class="danger">
+    <strong>OOM으로 빌드가 죽음</strong> → § 2-2 swap 누락. <code>free -h</code>로 swap 2.0Gi 확인 후 <code>docker compose up -d --build</code> 재시도.<br>
+    <strong>컨테이너 Up 됐다가 곧 Exited</strong> → <code>docker compose logs</code>에서 <code>HF_TOKEN</code> 401 또는 모델 로드 실패 확인.
+  </div>
+
+  <div class="checkpoint">
+    <strong>체크포인트.</strong> <code>curl -I http://127.0.0.1:7860</code>이 <code>HTTP/1.1 200 OK</code>를 반환한다. 외부 접속은 아직 안 된다 — 다음 단계 nginx에서 80→7860 reverse proxy를 깐다.
+  </div>
+</article>
+
+
+<article id="s4">
+  <h2><span class="step-num">4</span>nginx 설정 교체 + 도메인 접속 검증</h2>
+
+  <p>§ 2-5에서 깐 nginx는 default welcome 페이지를 띄우는 상태다. 이걸 calorie-counter용 reverse proxy(80 → 7860) 설정으로 교체한다.</p>
+
+  <h3>4-1. zip 동봉 설정 적용 + 본인 ID 치환</h3>
+
+<pre><code># zip의 nginx-calorie.conf를 nginx 표준 위치로 복사
+sudo cp ~/calorie/nginx-calorie.conf /etc/nginx/sites-available/calorie-counter
+
+# __STUDENT_ID__ 자리를 본인 ID(시트 B 컬럼의 prefix)로 바꾼다
+sudo vi /etc/nginx/sites-available/calorie-counter
+
+# 변경 전:  server_name __STUDENT_ID__-demo.aiweb2026.site;
+# 변경 후:  server_name s01-demo.aiweb2026.site;     ← 본인 ID로</code></pre>
+
+<pre><code># sites-enabled로 심볼릭 링크 + 기본 default 사이트 제거
+sudo ln -s /etc/nginx/sites-available/calorie-counter /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# 문법 검증 — 통과해야 reload 가능
+sudo nginx -t
+# nginx: configuration file /etc/nginx/nginx.conf test is successful
+
+# 적용
+sudo systemctl reload nginx
+sudo systemctl status nginx --no-pager | head -5
+# active (running) 확인</code></pre>
+
+  <div class="why">
+    <strong>왜 80번만 받고 HTTPS는 없나.</strong> Cloudflare Universal SSL이 <code>*.aiweb2026.site</code>에 인증서를 자동 발급·갱신한다. 본인 origin은 80번 HTTP만 받으면 끝이고 cert 파일을 만질 일이 없다.
+  </div>
+
+  <h3>4-2. 검증 — 서버 자기 자신, IP 직접, 도메인</h3>
+
+<pre><code># 서버에서 — nginx가 받아 7860으로 넘겨주는지
+curl -I http://127.0.0.1
+# HTTP/1.1 200 OK</code></pre>
+
+  <p>본인 PC 브라우저에서 <code>http://&lt;본인_Public_IP&gt;</code>로 접속 → Gradio UI가 떠야 한다.</p>
+
+  <p>도메인은 시트에 IP 입력한 시점부터 <strong>최대 5분</strong>까지 Worker 캐시 새로고침 대기. 다음 URL로 접속:</p>
+
+<pre><code>https://&lt;본인_ID&gt;-demo.aiweb2026.site</code></pre>
+
+  <table>
+    <tr><th>증상</th><th>원인 / 처리</th></tr>
+    <tr><td>자물쇠 + Gradio UI + 음식 사진 분석 응답</td><td>STAGE 1 끝. STAGE 2로 진행</td></tr>
+    <tr><td>404 "학생 페이지가 아직 등록되지 않았습니다"</td><td>시트 D 컬럼 비었거나 Worker 캐시 5분 대기 중</td></tr>
+    <tr><td>502 "학생 페이지에 접근할 수 없습니다"</td><td>본인 origin 80번이 외부에서 안 닿음 — § 2-3 iptables, § 2-4 Security List 점검</td></tr>
+    <tr><td>UI는 뜨는데 분석이 무한 로딩</td><td>nginx WebSocket 헤더 누락 — zip 동봉본을 직접 손댔다면 원본 다시 복사</td></tr>
+    <tr><td>Cloudflare error code: 1003</td><td>Cloudflare 측 라우팅 이슈 — 강사에게 알린다</td></tr>
+  </table>
+
+  <div class="checkpoint">
+    <strong>체크포인트.</strong> <code>https://&lt;본인_ID&gt;-demo.aiweb2026.site</code>로 접속 시 자물쇠 + Gradio UI + 음식 사진 업로드 → 칼로리 응답까지 정상. <strong>여기까지 STAGE 1 종료.</strong> 10분 쉬고 STAGE 2로.
+  </div>
+</article>
+
+
+<!-- ==================== STAGE 2 ==================== -->
+<div class="stage-banner s2">
+  <div class="num">2</div>
+  <div>
+    <h2>STAGE 2 — GitHub Actions로 자동 배포 연결</h2>
+    <p>이후엔 코드 수정 → <code>git push</code> 한 번이면 30초 안에 본인 사이트 갱신.</p>
+  </div>
+</div>
+
+
+<article id="s5">
+  <h2><span class="step-num s2">5</span>GitHub 리포 + Secret 4개 등록</h2>
+
+  <h3>5-1. 본인 GitHub에 리포 생성</h3>
+
+  <p><a href="https://github.com" target="_blank" rel="noopener">github.com</a> 우상단 <strong>+</strong> 버튼 → <strong>New repository</strong>.</p>
+
+  <table>
+    <tr><th>필드</th><th>값</th></tr>
+    <tr><td>Repository name</td><td><code>my-calorie-counter</code> (자유)</td></tr>
+    <tr><td>Description</td><td>비워둠</td></tr>
+    <tr><td>Public / Private</td><td><strong>Public</strong> 권장 — Actions 무료 분량 무제한</td></tr>
+    <tr><td>Add a README file</td><td>체크 안 함 (zip에 이미 있음)</td></tr>
+    <tr><td>Add .gitignore / license</td><td>둘 다 None</td></tr>
+  </table>
+
+  <p>맨 아래 <strong>Create repository</strong> 클릭.</p>
+
+  <h3>5-2. zip 내용을 본인 PC에 복사 + push</h3>
+
+<pre><code># 본인 PC에서
+git clone https://github.com/&lt;본인&gt;/my-calorie-counter.git
+cd my-calorie-counter
+
+# zip 풀어둔 폴더에서 .env 빼고 모두 복사
+# (서버에 풀어둔 ~/calorie가 아니라 본인 PC의 zip 압축 해제 폴더)
+
+# macOS / Linux
+cp -r ~/Downloads/week10_calorie/. .
+ls -A   # .gitignore, .github 같은 hidden도 같이 복사됐는지 확인
+
+# Windows PowerShell
+Copy-Item -Path "$env:USERPROFILE\Downloads\week10_calorie\*" `
+          -Destination . -Recurse -Force</code></pre>
+
+<pre><code># .gitignore에 .env가 들어있는지 한 번 더 확인
+cat .gitignore | Select-String "^\.env$"     # PowerShell
+cat .gitignore | grep -E "^\.env$"           # macOS / Linux
+# .env  ← 한 줄 출력되면 OK
+
+# 첫 push
+git add .
+git status                # .env가 staged 목록에 없는지 한 번 더 확인!
+git commit -m "init: 10주차 칼로리카운터 + Docker + CI/CD"
+git push origin main</code></pre>
+
+  <div class="danger">
+    <strong>.env 절대 push 금지.</strong> HF_TOKEN이 노출된다. <code>git status</code>에서 <code>.env</code>가 staged 목록에 보이면 즉시 중단하고 <code>git rm --cached .env</code>.
+  </div>
+
+  <h3>5-3. Secret 4개 등록</h3>
+
+  <p>GitHub Actions가 본인 Oracle 서버에 SSH로 들어가려면 민감한 값 4개가 필요하다. 이걸 GitHub의 Secret 저장소에 넣으면 워크플로우 실행 시 자동으로 환경변수로 주입된다.</p>
+
+  <div class="breadcrumb">
+    github.com/&lt;본인&gt;/my-calorie-counter <span class="arr">›</span> Settings 탭
+    <span class="arr">›</span> 좌측 Security 영역 <span class="arr">›</span> Secrets and variables
+    <span class="arr">›</span> Actions <span class="arr">›</span> <span class="now">New repository secret</span>
+  </div>
+
+  <p>Name과 Secret 값을 차례로 4번 입력한다 (한 번에 한 개씩).</p>
+
+  <table>
+    <tr><th>이름</th><th>값</th></tr>
+    <tr><td><code>SSH_HOST</code></td><td>본인 Oracle Public IP (예: <code>168.110.127.64</code>)</td></tr>
+    <tr><td><code>SSH_USER</code></td><td><code>ubuntu</code></td></tr>
+    <tr><td><code>SSH_KEY</code></td>
+        <td><code>~/.ssh/oracle_key</code> 파일 <strong>전체 내용</strong> (개행 포함, <code>-----BEGIN OPENSSH PRIVATE KEY-----</code>부터 <code>-----END OPENSSH PRIVATE KEY-----</code>까지 통째로)</td></tr>
+    <tr><td><code>HF_TOKEN</code></td><td>본인 Hugging Face 토큰 (<code>hf_</code>로 시작)</td></tr>
+  </table>
+
+  <img class="shot" src="images/week10/github_secrets_completed.png" alt="Repository secrets 페이지에 SSH_HOST, SSH_KEY, SSH_USER, HF_TOKEN 4개가 등록된 화면">
+  <p class="shot-cap">4개 Secret 모두 등록한 직후의 모습. 값은 보이지 않고 이름만 보이는 게 정상.</p>
+
+  <div class="danger">
+    <strong>SSH_KEY CRLF 함정 (Windows).</strong> Windows에서 키 파일 내용을 클립보드 복붙하면 줄바꿈이 CRLF(<code>\r\n</code>)로 들어가서 SSH가 거부한다.<br>
+    PowerShell에서 권장 방법:
+<pre><code>Get-Content $env:USERPROFILE\.ssh\oracle_key -Raw | Set-Clipboard</code></pre>
+    위 명령으로 클립보드에 복사한 뒤 GitHub Secret 입력란에 붙여넣기. 또는 VS Code로 키 파일을 연 다음 우하단의 줄바꿈 표시가 <strong>LF</strong>인지 확인 후 <strong>전체 선택 → 복사 → 붙여넣기</strong>.
+  </div>
+
+  <h3>5-4. <code>deploy.yml</code> 한 번 훑어보기</h3>
+
+  <p>zip 안 <code>.github/workflows/deploy.yml</code>이 자동 배포 정의 파일. 핵심만 보면:</p>
+
+<pre><code class="language-yaml">on:
+  push:
+    branches: [main]              # main에 push하면 트리거
+  workflow_dispatch:               # 수동 트리거 버튼
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Oracle 서버에 SSH로 배포
+        uses: appleboy/ssh-action@v1
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: REPO_URL
+          script: |
+            set -e
+            cd /home/ubuntu/calorie
+            # 첫 배포라 .git이 없으면 자동 초기화
+            if [ ! -d .git ]; then
+              git init
+              git remote add origin "$REPO_URL"
+            fi
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose up -d --build</code></pre>
+
+  <div class="why">
+    <strong>첫 배포의 자동 초기화.</strong> STAGE 1에서 zip을 풀어둔 <code>~/calorie</code>는 git 리포가 아니다. 워크플로우가 <code>.git</code>이 없으면 자동으로 <code>git init</code> + <code>git remote add</code>를 실행해 다음 <code>git fetch</code>가 동작하도록 만든다. 본인이 SSH 접속해서 따로 손댈 필요 없다.
+  </div>
+
+  <div class="checkpoint">
+    <strong>체크포인트.</strong> 본인 리포 Settings → Secrets에 SSH_HOST, SSH_USER, SSH_KEY, HF_TOKEN 4개 모두 등록되어 있다.
+  </div>
+</article>
+
+
+<article id="s6">
+  <h2><span class="step-num s2">6</span>첫 자동 배포 — push → Actions green</h2>
+
+  <h3>6-1. 코드 한 줄 수정 + push</h3>
+
+<pre><code># 본인 PC, my-calorie-counter 리포에서
+vi app.py
+# 어디든 한 글자 수정 (예: title 텍스트 살짝 변경)
+
+git add app.py
+git commit -m "test: 첫 자동 배포"
+git push origin main</code></pre>
+
+  <h3>6-2. 두 화면을 동시에 본다</h3>
+
+  <p>두 탭을 띄워두고 번갈아 본다.</p>
+
+  <table>
+    <tr><th>탭</th><th>주소</th><th>볼 것</th></tr>
+    <tr>
+      <td>탭 1</td>
+      <td><code>github.com/&lt;본인&gt;/my-calorie-counter/actions</code></td>
+      <td>새 워크플로우 실행 — 노란 ● → 회색(running) → ✅ 그린 체크 (1~2분)</td>
+    </tr>
+    <tr>
+      <td>탭 2</td>
+      <td><code>https://&lt;본인_ID&gt;-demo.aiweb2026.site</code></td>
+      <td>Actions 그린 직후 새로고침 → 변경 즉시 반영</td>
+    </tr>
+  </table>
+
+  <table>
+    <tr><th>증상</th><th>처리</th></tr>
+    <tr><td>Actions 탭에 워크플로우 자체가 안 뜸</td><td><code>.github/workflows/deploy.yml</code> 경로 오타. 정확히 이 위치여야 함</td></tr>
+    <tr><td><code>dial tcp: connect: connection refused</code></td><td>SSH_HOST IP 오타 또는 OCI Security List 22번 막힘</td></tr>
+    <tr><td><code>Permission denied (publickey)</code></td><td>SSH_KEY가 CRLF로 들어감. § 5-3 함정 박스 다시 확인</td></tr>
+    <tr><td>Actions 그린인데 사이트가 502</td><td>새 컨테이너가 OOM. 서버 SSH 들어가서 <code>docker compose logs</code></td></tr>
+    <tr><td>Actions 그린인데 변경이 안 보임</td><td>브라우저 캐시. Ctrl+Shift+R 하드 리프레시 또는 시크릿 창에서 확인</td></tr>
+  </table>
+
+  <h3>6-3. 인증 캡처</h3>
+
+  <p>본인 사이트의 변경된 부분을 캡처해서 9주차 페이지 댓글 thread에 한 줄 댓글로 남긴다 — "10주차 첫 자동 배포 완료, 변경: title 수정". 동료들이 본인 사이트 가서 확인할 수 있는 신호.</p>
+
+  <div class="checkpoint">
+    <strong>체크포인트.</strong> Actions 탭에 그린 체크 1개 + 본인 도메인 새로고침 시 변경사항 반영. 둘 다 확인되면 STAGE 2 끝.
+  </div>
+</article>
+
+
+<article id="s7">
+  <h2><span class="step-num">7</span>9주차 페이지 "Live Demo" 링크 살리기</h2>
+
+  <p>9주차에 만든 <code>&lt;본인_ID&gt;.aiweb2026.site</code> 소개 페이지에는 "Live Demo (Coming Week 10)" 버튼이 placeholder로 남아 있다. 본인 데모 URL로 교체한다.</p>
+
+  <h3>7-1. 9주차 페이지 리포에서 버튼 텍스트 교체</h3>
+
+<pre><code># 9주차에 만든 데모 소개 페이지 리포로 이동
+cd ~/&lt;본인_ID&gt;-aiweb2026     # 9주차 때 만든 리포 이름
+
+vi index.html</code></pre>
+
+  <p><code>index.html</code>에서 placeholder 버튼을 찾아 본인 데모 URL로 교체한다.</p>
+
+<pre><code class="language-html">&lt;!-- 변경 전 (9주차 placeholder) --&gt;
+&lt;a href="#" class="btn btn-primary"&gt;Live Demo (Coming Week 10)&lt;/a&gt;
+
+&lt;!-- 변경 후 (10주차) --&gt;
+&lt;a href="https://&lt;본인_ID&gt;-demo.aiweb2026.site"
+   class="btn btn-primary"
+   target="_blank"
+   rel="noopener"&gt;Live Demo&lt;/a&gt;</code></pre>
+
+  <p class="small"><code>target="_blank"</code>: 새 탭으로 연다. <code>rel="noopener"</code>: 새 탭이 부모 창의 <code>window.opener</code>에 접근하지 못하도록 막는 보안 옵션.</p>
+
+<pre><code>git add index.html
+git commit -m "feat: Live Demo 링크 활성화 — 본인 칼로리카운터 연결"
+git push origin main</code></pre>
+
+  <h3>7-2. Cloudflare Pages 자동 빌드 → 페이지 반영</h3>
+
+  <p>Cloudflare Pages가 push를 감지하면 1~2분 안에 자동 빌드·배포한다. <code>https://&lt;본인_ID&gt;.aiweb2026.site</code> 새로고침 → "Live Demo" 클릭 → 새 탭에서 본인 칼로리카운터로 이동하면 끝.</p>
+
+  <div class="why">
+    <strong>옵션 · 9주차 정정 — Pages와 Workers는 사실상 한 제품으로 통합됐다.</strong><br>
+    9주차에서는 "정적 = Cloudflare Pages, 서버리스 = Cloudflare Workers"로 둘을 별개 제품처럼 설명했다. 2026년 5월 현재 Cloudflare는 <strong>Pages를 유지보수 모드</strong>로 두고 신규 프로젝트는 <strong>Workers의 Static Assets binding</strong>으로 통합하도록 안내한다. 정적 파일과 라우팅 코드를 한 프로젝트에 같이 두고 <code>wrangler deploy</code> 한 번에 배포하는 방식.
+    <ul style="margin:0.4em 0 0;padding-left:1.3em;">
+      <li>강사 인프라(<code>aiweb2026-hub</code>)도 이미 Workers 단일 구조다 — <code>wrangler.toml</code>의 <code>[assets]</code> 블록에서 <code>./public</code>을 정적으로 서빙하고, <code>src/index.js</code> Worker가 <code>*-demo.aiweb2026.site</code> 트래픽을 시트 매핑 기반으로 라우팅한다.</li>
+      <li>오늘 본인 9주차 페이지는 그대로 Pages에 둬도 작동하지만, 학기 종료 후 본인 인프라로 옮길 땐 Workers Static Assets로 마이그레이션하는 편이 향후 기능 확장(API·세션·KV·D1)이 쉽다.</li>
+      <li>공식: <a href="https://developers.cloudflare.com/workers/static-assets/" target="_blank" rel="noopener">developers.cloudflare.com/workers/static-assets</a> — Pages에서 Workers로 마이그레이션 가이드 포함.</li>
+    </ul>
+    오늘 실습은 9주차에 만든 Pages 프로젝트를 그대로 쓴다. 정정은 알아두기만 하면 된다.
+  </div>
+
+  <h3>7-3. 동료 1명 교차 검증</h3>
+
+  <p>본인 사이트만 보지 말고 옆자리 동료 사이트도 가서 "Live Demo" 버튼이 작동하는지 본다. 작동하면 9주차 댓글 thread에 답글:</p>
+
+<pre><code>@동료ID Live Demo 정상 작동 — title 변경사항도 보임</code></pre>
+
+  <p>작동 안 하면 어떤 증상인지 한 줄 답글:</p>
+
+<pre><code>@동료ID Live Demo 클릭하면 502 Bad Gateway. 컨테이너 죽었나 봅니다</code></pre>
+
+  <div class="checkpoint">
+    <strong>체크포인트.</strong> 본인 페이지의 Live Demo 버튼이 본인 칼로리카운터로 연결되고, 동료 1명의 페이지에서도 같은 흐름이 작동한다.
+  </div>
+</article>
+
+
+<article id="s8">
+  <h2><span class="step-num">8</span>자주 막히는 함정 모음</h2>
+
+  <table>
+    <tr><th>#</th><th>증상</th><th>원인 / 처리</th></tr>
+    <tr><td>1</td><td><code>Permissions 0644 for ssh key are too open</code></td><td><code>chmod 600 ~/.ssh/oracle_key</code> (Windows는 키 파일 우클릭 → 속성 → 보안 → 본인만 권한)</td></tr>
+    <tr><td>2</td><td>SSH <code>Connection timed out</code></td><td>OCI Security List에서 22번 ingress 누락. § 2-4와 동일 절차로 22번도 추가</td></tr>
+    <tr><td>3</td><td>docker compose 첫 빌드 OOM</td><td>swap 2GB 누락. § 2-2 다시</td></tr>
+    <tr><td>4</td><td>외부에서 80번 접속 안 됨</td><td>iptables ALLOW가 REJECT 뒤에 들어감 (§ 2-3) 또는 OCI Security List 80 ingress 누락 (§ 2-4)</td></tr>
+    <tr><td>5</td><td>502 Bad Gateway (자기 도메인 접속 시)</td><td><code>docker compose ps</code> → 죽었으면 <code>docker compose logs</code>로 OOM 또는 HF_TOKEN 누락 확인</td></tr>
+    <tr><td>6</td><td>404 "학생 페이지 등록 안 됨"</td><td>시트 D 컬럼 비었거나 Worker 캐시 5분 대기 중. 시트 다시 확인 후 5분 더 기다림</td></tr>
+    <tr><td>7</td><td>Gradio UI는 뜨는데 분석이 무한 로딩</td><td>nginx WebSocket 헤더 누락. zip 동봉 <code>nginx-calorie.conf</code> 그대로 쓰면 발생 안 함 — 직접 손댔으면 원본 다시 복사</td></tr>
+    <tr><td>8</td><td>GitHub Actions <code>Permission denied (publickey)</code></td><td>SSH_KEY가 CRLF로 들어감. § 5-3 함정 박스 다시 확인</td></tr>
+    <tr><td>9</td><td>워크플로우는 그린인데 사이트는 옛 모습</td><td>브라우저 캐시. Ctrl+Shift+R 또는 시크릿 창</td></tr>
+    <tr><td>10</td><td>Bot Fight Mode가 GitHub Actions IP 차단</td><td>Cloudflare 대시보드 → Security → Bots → Bot Fight Mode OFF</td></tr>
+  </table>
+</article>
+
+
+<article id="wrap">
+  <h2>학기 종료 후 인프라 유지</h2>
+
+  <table>
+    <tr><th>자산</th><th>학기 종료 후</th></tr>
+    <tr><td>Oracle Always Free 인스턴스</td><td>영구 무료. 본인 OCI 계정에서 관리</td></tr>
+    <tr><td>본인 GitHub 리포 + Actions</td><td>영구 무료 (Public 리포 무제한)</td></tr>
+    <tr><td><code>aiweb2026.site</code> 도메인</td><td>강사 자산. 학기 한정 — 본인 도메인 구매 시 이전 가능</td></tr>
+    <tr><td>Cloudflare Worker 라우팅</td><td>강사 자산. 학기 종료 시 폐기</td></tr>
+    <tr><td>HF_TOKEN</td><td>본인 계정. 영구</td></tr>
+  </table>
+
+  <p class="small">본인 도메인 구매로 학기 종료 후에도 본인 인프라로 운영 가능. 별도 가이드는 강사가 학기말에 안내한다.</p>
+
+  <h3>다른 언어로 만들고 싶다면</h3>
+  <p>오늘 코드는 Python(Gradio)이지만, CI/CD 자체는 언어와 무관하다. GitHub Actions YAML이 하는 일은 "서버에 SSH로 들어가서 <code>docker compose up</code> 실행"이 전부 — 컨테이너 안에서 Python이 돌든 Java가 돌든 서버는 모른다. <strong>Dockerfile 한 파일만 바꾸면</strong> 오늘 워크플로우가 그대로 작동한다.</p>
+
+  <table>
+    <tr><th>언어</th><th>Dockerfile 베이스</th><th>빌드/실행</th></tr>
+    <tr><td>Python (오늘)</td><td><code>FROM python:3.11-slim</code></td><td><code>pip install -r requirements.txt</code> + <code>python app.py</code></td></tr>
+    <tr><td>Node.js</td><td><code>FROM node:20-slim</code></td><td><code>npm install</code> + <code>npm start</code></td></tr>
+    <tr><td>Java (Spring Boot)</td><td><code>FROM eclipse-temurin:17-jdk</code></td><td><code>./gradlew bootJar</code> + <code>java -jar app.jar</code></td></tr>
+    <tr><td>Go</td><td><code>FROM golang:1.22-alpine</code></td><td><code>go build</code> + <code>./app</code></td></tr>
+  </table>
+</article>
+
+</main>
+</div>
+</body>
+</html>
