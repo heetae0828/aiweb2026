@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>11주차 — 기말 프로젝트 정의 + HF Spaces 폴백</title>
+<style>
+  :root {
+    --accent:#f97316; --accent2:#0ea5e9; --ink:#1a1a2e;
+    --green:#047857; --red:#ef4444; --bg:#f8fafc;
+    --card:#ffffff; --line:#e5e7eb; --muted:#6b7280;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:'Segoe UI','Apple SD Gothic Neo',sans-serif; line-height:1.6; }
+  .wrap { max-width:880px; margin:0 auto; padding:2.5rem 1.4rem 4rem; }
+  h1 { font-size:1.9rem; margin:0 0 0.4rem; letter-spacing:-0.01em; }
+  h2 { font-size:1.25rem; margin:2.2rem 0 0.6rem; padding-top:0.6rem;
+       border-top:1px solid var(--line); color:var(--ink); }
+  h3 { font-size:1.0rem; margin:1.2rem 0 0.4rem; color:var(--green); }
+  p, li { font-size:0.95rem; }
+  code { background:#f1f5f9; color:#be123c; padding:0.1em 0.4em;
+         border-radius:4px; font-family:Menlo,Monaco,monospace; font-size:0.88em; }
+  pre { background:#1e293b; color:#e2e8f0; padding:0.9em 1em;
+        border-radius:8px; overflow-x:auto; font-size:0.82rem; line-height:1.55;
+        font-family:Menlo,Monaco,monospace; }
+  pre code { background:transparent; color:inherit; padding:0; }
+  table { border-collapse:collapse; width:100%; margin:0.6em 0; font-size:0.88rem; }
+  th, td { border:1px solid var(--line); padding:0.5em 0.7em; vertical-align:top; text-align:left; }
+  th { background:#fef3c7; }
+  .hero {
+    background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);
+    color:white; border-radius:14px; padding:1.6rem 1.4rem; margin-bottom:1.6rem;
+  }
+  .hero .badge { display:inline-block; background:rgba(255,255,255,0.22);
+    padding:0.2rem 0.7rem; border-radius:999px; font-size:0.72rem;
+    letter-spacing:0.12em; font-weight:700; }
+  .hero h1 { color:white; margin:0.5rem 0 0.4rem; }
+  .hero p { font-size:0.95rem; opacity:0.95; margin:0; }
+  .danger {
+    background:#fef2f2; border-left:4px solid var(--red);
+    padding:0.7em 1em; border-radius:6px; margin:0.8em 0;
+  }
+  .danger strong { color:var(--red); }
+  .why {
+    background:#fff7ed; border-left:4px solid var(--accent);
+    padding:0.7em 1em; border-radius:6px; margin:0.8em 0;
+  }
+  .ok {
+    background:#ecfdf5; border-left:4px solid var(--green);
+    padding:0.7em 1em; border-radius:6px; margin:0.8em 0;
+  }
+  .toc { background:var(--card); border:1px solid var(--line);
+    border-radius:10px; padding:0.9rem 1.1rem; }
+  .toc strong { color:var(--ink); }
+  .toc ol { margin:0.3rem 0 0 1rem; padding:0; }
+  .toc li { margin:0.2rem 0; font-size:0.9rem; }
+  .toc a { color:var(--accent2); text-decoration:none; }
+  .toc a:hover { text-decoration:underline; }
+  .checklist {
+    background:var(--card); border:1px solid var(--line); border-radius:8px;
+    padding:0.9rem 1.2rem; margin:0.8em 0;
+  }
+  .checklist li { list-style:none; padding-left:1.6em; position:relative; margin:0.3em 0; }
+  .checklist li::before {
+    content:"□"; position:absolute; left:0; color:var(--accent);
+    font-size:1.1rem; line-height:1.3;
+  }
+  .small { font-size:0.82rem; color:var(--muted); }
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin:0.8em 0; }
+  .two-col > div { background:var(--card); border:1px solid var(--line);
+    border-radius:8px; padding:0.8rem 1rem; }
+  .two-col h3 { margin-top:0; }
+  @media (max-width:700px) { .two-col { grid-template-columns:1fr; } }
+  .shot { width:100%; max-width:760px; border:1px solid var(--line); border-radius:8px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.08); display:block; margin:0.6rem auto; background:#fff; }
+  .shot-caption { font-size:0.82rem; color:var(--muted); text-align:center; margin:-0.2rem 0 0.8rem; }
+  .num-circle { display:inline-block; width:20px; height:20px; border-radius:50%;
+    color:white; text-align:center; font-weight:700; font-size:0.78rem; line-height:20px;
+    margin-right:0.3em; }
+  .nc-r { background:#ef4444; } .nc-o { background:#f97316; } .nc-b { background:#0ea5e9; }
+  .nc-g { background:#10b981; } .nc-p { background:#8b5cf6; } .nc-pk { background:#ec4899; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hero">
+  <span class="badge">11주차 · 2026 AI웹융합</span>
+  <h1>기말 프로젝트 정의 + HF Spaces 폴백</h1>
+  <p>본인 기말 프로젝트를 한 장(<code>contents.md</code>)에 잡아 본인 페이지에 반영하고 강사 댓글까지. OCI 미완 학생은 HF Spaces로 인프라 구축.</p>
+</div>
+
+<div class="why">
+  <strong>오늘 산출물.</strong>
+  <ol style="margin:0.4em 0 0 1.2em;">
+    <li>본인 <code>contents.md</code> v1 — 본인 페이지(<code>&lt;id&gt;.aiweb2026.site</code>)에 렌더 + 강사 댓글</li>
+    <li>9주차 페이지 <code>index.html</code> placeholder를 본인 기말 프로젝트 값으로 교체</li>
+    <li>본인 트랙(A/B/C/자유) 확정</li>
+    <li>OCI 미완 학생: HF Space Live URL 작동 (OCI 완료 학생은 기존 사이트 유지)</li>
+  </ol>
+</div>
+
+<h2 id="s0">0. 학생 자료 폴더 2개</h2>
+
+<p>본 수업 자료 폴더(<code>01_for_student/week11/</code>) 안에 다음 2개 폴더가 함께 들어있다. 모든 학생이 ①을 쓰고, OCI 미완 학생만 ②를 추가로 쓴다.</p>
+
+<table>
+  <tr><th>폴더</th><th>용도</th><th>대상</th><th>관련 섹션</th></tr>
+  <tr>
+    <td><code>demo_intro_template/</code></td>
+    <td><code>contents.md</code> 템플릿 + 9주차 페이지 갱신본(<code>index.html</code> / <code>style.css</code>)</td>
+    <td>전원</td>
+    <td>§ 3</td>
+  </tr>
+  <tr>
+    <td><code>hf_starter/</code></td>
+    <td>HF Space Docker 모드 칼로리카운터 폴백 (Dockerfile 포트 7860 + GitHub Actions sync 포함)</td>
+    <td>OCI 미완 학생</td>
+    <td>§ 5</td>
+  </tr>
+</table>
+
+<div class="danger">
+  <strong>숨김 파일 함께 복사할 것.</strong> <code>hf_starter/</code>에는 <code>.github/</code>·<code>.gitignore</code>·<code>.env.example</code>처럼 점(<code>.</code>)으로 시작하는 항목이 있다. 일반 복사로 빠지면 GitHub Actions가 안 돈다.
+  <ul style="margin:0.4em 0 0 1.2em;">
+    <li>macOS Finder: <code>Cmd+Shift+.</code>으로 숨김 표시 토글 후 함께 선택·복사</li>
+    <li>Windows 탐색기: <strong>보기 → 숨긴 항목</strong> 체크 후 함께 선택·복사</li>
+    <li>터미널: <code>cp -r ./* ./.[!.]* &lt;대상&gt;/</code> 같이 점 파일까지 명시</li>
+  </ul>
+</div>
+
+<div class="toc">
+  <strong>순서</strong>
+  <ol>
+    <li><a href="#s1">10주차 회고 (10분)</a></li>
+    <li><a href="#s2">기말 프로젝트 가이드라인 + 트랙 시안 (20분)</a></li>
+    <li><a href="#s3">1인 1 contents.md 작성 (45분)</a></li>
+    <li><a href="#s4">본인 페이지 반영 (15분)</a></li>
+    <li><a href="#s5">HF Spaces 폴백 인프라 구축 (45분)</a></li>
+    <li><a href="#s6">마무리 (5분)</a></li>
+  </ol>
+</div>
+
+<h2 id="s1">1. 10주차 회고 (10분)</h2>
+
+<p>10주차 Oracle 배포에서 끝까지 간 학생도, 가입에서 막힌 학생도 있다. 막힌 건 본인 카드·계정 문제가 아니라 Oracle 측 검증 시스템 문제다. 11주차부터 두 트랙을 동등하게 받는다.</p>
+
+<div class="two-col">
+  <div>
+    <h3>OCI 트랙 (10주차 완주 학생)</h3>
+    <ul>
+      <li>10주차 자료 그대로 사용</li>
+      <li>Live URL: <code>&lt;id&gt;-demo.aiweb2026.site</code></li>
+      <li>본인 도메인 연결 유지</li>
+      <li>오늘 새로 만들 인프라 없음</li>
+    </ul>
+  </div>
+  <div>
+    <h3>HF 트랙 (OCI 미완 학생)</h3>
+    <ul>
+      <li>HF Spaces (Docker 모드)로 폴백</li>
+      <li>Live URL (전체화면 직접 앱): <code>https://&lt;id&gt;-&lt;repo&gt;.hf.space</code></li>
+      <li>본인 도메인 연결 X — HF URL 사용</li>
+      <li>구축 절차는 § 5에서 진행</li>
+    </ul>
+  </div>
+</div>
+
+<p>평가 기준은 트랙과 무관. 본인 Live URL 작동 + 기말 핵심 기능 작동 두 가지로 판단한다. 오늘 흐름: § 2~4에서 모두가 본인 <code>contents.md</code>를 본인 페이지에 반영. 강사는 작성 중 돌아다니며 지원하고 어느정도 됐을 때 둘러보며 댓글을 단다. § 5는 OCI 미완 학생 필수, OCI 완료 학생은 학습용으로 따라해도 OK.</p>
+
+<h2 id="s2">2. 기말 프로젝트 가이드라인 + 트랙 시안 (20분)</h2>
+
+<p>오늘은 코드를 짜는 회차가 아니다. 본인이 무엇을 만들지 한 장에 잡고 강사 댓글을 받는 회차다.</p>
+
+<h3>적격성 체크리스트는 contents.md에 있다</h3>
+
+<p>본인이 채울 <code>contents.md</code> 끝부분의 <strong>"적격성 체크리스트"</strong> 8개 항목이 본인 점검표다. § 3에서 contents.md를 채우면서 <code>[ ]</code> → <code>[x]</code>로 자가 점검한다. 강사 댓글에서 보완 포인트가 추가될 수 있다.</p>
+
+<p class="small">여기 html에 복제하지 않는 이유 — 항목은 <code>contents.md</code>가 단일 출처. 두 곳에 두면 한 쪽 갱신 시 다른 쪽이 어긋난다.</p>
+
+<h3>트랙 시안 + 자유 트랙</h3>
+
+<table>
+  <tr>
+    <th>트랙</th>
+    <th>패턴</th>
+    <th>응용 예</th>
+  </tr>
+  <tr>
+    <td><strong>A. LLM API 챗봇</strong></td>
+    <td>OpenAI / Anthropic / Gemini API key + Gradio/Streamlit UI</td>
+    <td>도메인 챗봇 · 문서 QA · 번역 · 코드 리뷰 · 글쓰기 보조</td>
+  </tr>
+  <tr>
+    <td><strong>B. HF 모델 매시업</strong></td>
+    <td>HF의 작은 모델 1~2개 조합 (1GB 이하)</td>
+    <td>이미지 분류 · 번역 · 요약 · 음성→텍스트</td>
+  </tr>
+  <tr>
+    <td><strong>C. 외부 API + LLM</strong></td>
+    <td>공공/외부 API → LLM 요약·분석·재구성</td>
+    <td>뉴스 요약기 · 공공데이터 인사이트 · 위키 학습 도우미</td>
+  </tr>
+  <tr>
+    <td><strong>자유 트랙</strong></td>
+    <td>위 외 본인 아이디어</td>
+    <td>체크리스트 만족 + 강사 댓글에서 협의</td>
+  </tr>
+</table>
+
+<h2 id="s3">3. 1인 1 contents.md 작성 (45분)</h2>
+
+<h3>3-1. demo_intro_template 폴더 → 9주차 리포에 복사</h3>
+
+<p>§ 0의 <code>demo_intro_template/</code> 폴더 안에 4개 파일이 들어있다.</p>
+
+<pre><code>demo_intro_template/
+├── contents.md     ← 학생이 채우는 본체 (신규)
+├── index.html      ← 9주차 페이지 갱신본 (덮어쓰기)
+├── style.css       ← contents.md 렌더 영역 스타일 (덮어쓰기)
+└── README.md       ← 작성 가이드 (먼저 1회 정독)</code></pre>
+
+<div class="danger">
+  <strong>index.html · style.css 덮어쓰기 필수.</strong> 본인 9주차 리포(<code>&lt;id&gt;-aiweb2026</code>)에 이미 있는 <code>index.html</code>·<code>style.css</code>는 9주차 시점의 OLD 버전이라 <code>contents.md</code>를 못 읽는다. 폴더의 새 파일로 덮어써야 본인 페이지에 contents가 렌더된다. 갱신본은 <code>&lt;script type="module" src="https://cdn.jsdelivr.net/npm/zero-md@3?register"&gt;&lt;/script&gt;</code> + <code>&lt;zero-md src="contents.md" no-shadow&gt;&lt;/zero-md&gt;</code>가 추가돼 있다.
+</div>
+
+<p>복사·덮어쓰기 흐름:</p>
+
+<pre><code># 본인 9주차 리포 작업 디렉터리에서 (예: ~/repos/&lt;id&gt;-aiweb2026)
+
+# 1) 기존 index.html / style.css 백업 (9주차 시점 본인 커스터마이즈 보존용)
+mv index.html index.html.bak
+mv style.css style.css.bak
+
+# 2) 새 파일 복사
+cp &lt;수업자료&gt;/week11/demo_intro_template/contents.md .
+cp &lt;수업자료&gt;/week11/demo_intro_template/index.html .
+cp &lt;수업자료&gt;/week11/demo_intro_template/style.css .
+
+# Windows PowerShell 예
+# Rename-Item index.html index.html.bak
+# Rename-Item style.css style.css.bak
+# Copy-Item &lt;수업자료&gt;\week11\demo_intro_template\contents.md .
+# Copy-Item &lt;수업자료&gt;\week11\demo_intro_template\index.html .
+# Copy-Item &lt;수업자료&gt;\week11\demo_intro_template\style.css .</code></pre>
+
+<p class="small">백업본(<code>.bak</code>)은 본인이 9주차에 커스터마이즈했던 부분(헤더 문구, 색상, 카드 등)을 새 파일에 옮겨 붙일 때 참조용. 다 옮겼으면 삭제. 헷갈리지 않게 commit 전에는 <code>.bak</code> 파일을 staging에서 빼거나 <code>.gitignore</code>에 <code>*.bak</code> 추가.</p>
+
+<p><code>contents.md</code> 파일명은 반드시 그대로 — 9주차 페이지가 이 이름으로 자동 렌더한다.</p>
+
+<h3>3-2. contents.md 작성 흐름</h3>
+
+<pre><code>처음 15분:  트랙 선택 + 인프라 트랙 표시 + 문제 + 사용자 + 핵심 기능 3개
+다음 15분:  입력/출력 흐름 + 기술 스택 + 데이터 출처
+마지막 15분: 완료 조건 + 본인 점검 체크리스트</code></pre>
+
+<p>안의 <code>[대괄호 placeholder]</code>를 모두 본인 값으로 교체. 적격성 체크리스트 8개 <code>[ ]</code> → <code>[x]</code>로 자가 점검.</p>
+
+<div class="why">
+  <strong>contents.md는 .md 파일이라 수시로 수정한다.</strong> 한 번 작성하고 끝나는 문서가 아님. 강사 댓글 받으면 → 보완 → push → 본인 사이트 새로고침. 12~13주차 구현하면서 기능·기술 스택·완료 조건이 바뀌면 그때마다 같이 갱신. <code>app.py</code>·<code>Dockerfile</code>이 살아있는 것처럼 <code>contents.md</code>도 살아있는 문서다.
+</div>
+
+<h3>3-3. GitHub에서 contents.md 편집하는 2가지 방법</h3>
+
+<p>본인 리포에 push한 뒤에도 GitHub 웹에서 바로 수정할 수 있다. 로컬 git pull/commit/push 안 거쳐도 됨.</p>
+
+<table>
+  <tr><th>방법</th><th>URL</th><th>특징</th></tr>
+  <tr>
+    <td>일반 GitHub</td>
+    <td><code>https://github.com/&lt;username&gt;/&lt;repo&gt;</code></td>
+    <td>파일 클릭 → 연필 아이콘 → 인라인 편집 → Commit. 빠른 한 줄 수정용.</td>
+  </tr>
+  <tr>
+    <td>VS Code Web (github.dev)</td>
+    <td><code>https://github.dev/&lt;username&gt;/&lt;repo&gt;</code></td>
+    <td>리포 페이지에서 키 <code>.</code>(마침표) 한 번 눌러도 같은 화면. 풀 VS Code 인터페이스 — 여러 파일 동시 편집, 검색, 미리보기. push까지 브라우저 한 번에 처리. 설치 불필요.</td>
+  </tr>
+</table>
+
+<p class="small">github.dev는 본인 PC에 git/VS Code 안 깔려 있어도 동작. 학교 PC·태블릿에서 contents.md 손볼 때 편하다. 변경은 자동 저장 안 되고 좌측 Source Control 패널에서 commit·push 명시적으로 눌러야 반영.</p>
+
+<h3>3-4. 사용할 모델 탐색 (HF Hub)</h3>
+
+<p>주로 트랙 B 학생에게 해당. 트랙 A/C 학생은 분류기·임베딩 등 보조 모델 고를 때 참고. <a href="https://huggingface.co/models">huggingface.co/models</a>에서 본인 데모에 쓸 모델을 찾는다.</p>
+
+<p><strong>필터 + 정렬 흐름</strong></p>
+
+<img class="shot" src="images/week06/02_models.png" alt="HuggingFace Models 탭 — 좌측 필터 + 본문 모델 리스트 + 상단 정렬">
+<p class="shot-caption"><span class="num-circle nc-r">1</span> 좌측 사이드바(Tasks · Languages · Libraries 필터) &nbsp;
+<span class="num-circle nc-b">2</span> 본문 모델 리스트 &nbsp;
+<span class="num-circle nc-g">3</span> 상단 검색·정렬 영역</p>
+
+<table>
+  <tr><th>번호</th><th>위치</th><th>이 수업에서 할 일</th></tr>
+  <tr><td><span class="num-circle nc-r">1</span></td><td>좌측 사이드바</td><td>Tasks에서 본인 데모 작업 선택 → Languages에서 <code>Korean</code> → Libraries는 <code>Transformers</code></td></tr>
+  <tr><td><span class="num-circle nc-b">2</span></td><td>본문 모델 리스트</td><td>다운로드 수·하트 수가 높은 것 위주로 후보 추리기</td></tr>
+  <tr><td><span class="num-circle nc-g">3</span></td><td>상단 검색·정렬</td><td>정렬을 <strong>Most Downloads</strong> 또는 <strong>Trending</strong>으로 변경</td></tr>
+</table>
+
+<p><strong>모델 카드에서 확인할 4가지</strong></p>
+
+<img class="shot" src="images/week06/03_model_card.png" alt="HuggingFace 모델 카드 페이지 — 탭 / Inference 위젯 / Use this model 버튼">
+<p class="shot-caption">예시: <code>nateraw/food</code> 모델 카드.
+<span class="num-circle nc-r">1</span> 탭 (Model card · Files and versions · Training metrics · Community) &nbsp;
+<span class="num-circle nc-b">2</span> Inference Providers 위젯 (브라우저에서 즉시 테스트) &nbsp;
+<span class="num-circle nc-g">3</span> Deploy · Use this model 버튼</p>
+
+<table>
+  <tr><th>항목</th><th>어디서</th><th>왜</th></tr>
+  <tr>
+    <td>모델 크기</td>
+    <td><span class="num-circle nc-r">1</span> 탭에서 <strong>Files and versions</strong> 클릭 → <code>*.safetensors</code> / <code>pytorch_model.bin</code> 용량</td>
+    <td>HF 무료 16GB RAM. 체크리스트 기준 1GB 이하 권장</td>
+  </tr>
+  <tr>
+    <td>라이선스</td>
+    <td>모델 카드 상단의 라이선스 태그 (예: <code>license: apache-2.0</code>)</td>
+    <td>MIT·Apache 2.0·CC는 OK. Llama·일부 모델은 상용 제한 — 확인 필요</td>
+  </tr>
+  <tr>
+    <td>Intended use / Limitations</td>
+    <td>본문 README (Model description · Intended uses &amp; limitations 섹션)</td>
+    <td>본인 데모 도메인 적합 여부, 알려진 편향·실패 케이스</td>
+  </tr>
+  <tr>
+    <td>예제 코드</td>
+    <td><span class="num-circle nc-g">3</span> 우측 상단 <strong>Use this model</strong> 버튼 → <code>pipeline</code> snippet</td>
+    <td>본인 <code>app.py</code>에 그대로 붙여 첫 동작 확인</td>
+  </tr>
+</table>
+
+<p><strong>최소 사용 예 (Transformers pipeline)</strong></p>
+
+<pre><code>from transformers import pipeline
+
+# 예: 한국어 감정 분석
+clf = pipeline("text-classification", model="<id>/<repo>")
+result = clf("이 영화 재밌었다")
+# [{'label': 'POSITIVE', 'score': 0.98}]</code></pre>
+
+<p class="small"><code>&lt;id&gt;/&lt;repo&gt;</code>는 본인이 고른 모델의 HF 경로. 예: <code>monologg/koelectra-small-finetuned-nsmc</code>.</p>
+
+<p><strong>추천 검색 시작점</strong></p>
+
+<table>
+  <tr><th>본인 데모 작업</th><th>HF 탐색 시작 URL</th></tr>
+  <tr><td>한국어 챗봇·생성</td><td><code>huggingface.co/models?language=ko&amp;pipeline_tag=text-generation</code></td></tr>
+  <tr><td>한국어 감정·분류</td><td><code>huggingface.co/models?language=ko&amp;pipeline_tag=text-classification</code></td></tr>
+  <tr><td>이미지 분류</td><td><code>huggingface.co/models?pipeline_tag=image-classification</code></td></tr>
+  <tr><td>번역 (한↔영)</td><td><code>huggingface.co/models?pipeline_tag=translation&amp;language=ko</code></td></tr>
+  <tr><td>음성 → 텍스트</td><td><code>huggingface.co/models?pipeline_tag=automatic-speech-recognition</code></td></tr>
+  <tr><td>이미지 → 텍스트</td><td><code>huggingface.co/models?pipeline_tag=image-to-text</code></td></tr>
+</table>
+
+<p>고른 모델 경로(<code>&lt;id&gt;/&lt;repo&gt;</code>)는 본인 <code>contents.md</code>의 "기술 스택" 항목에 명시한다.</p>
+
+<h2 id="s4">4. 본인 페이지 반영 (15분)</h2>
+
+<h3>4-1. contents.md 본인 페이지에 반영</h3>
+
+<p>3-1에서 덮어쓴 <code>index.html</code>은 같은 폴더의 <code>contents.md</code>를 <code>zero-md</code>로 인라인 렌더한다.</p>
+
+<pre><code>git add contents.md index.html style.css
+git commit -m "feat: 기말 프로젝트 contents v1 + 9주차 페이지 갱신"
+git push origin main</code></pre>
+
+<p>1~2분 후 본인 도메인(<code>&lt;id&gt;.aiweb2026.site</code>) 새로고침 → contents.md가 페이지에 렌더되는지 확인.</p>
+
+<div class="danger">
+  <strong>로컬에서 확인하려면 http 서버 띄울 것.</strong>
+  <code>index.html</code>을 탐색기 더블클릭으로 열면 브라우저가 보안 정책상 같은 폴더의 <code>contents.md</code>를 못 읽는다. 결과: 제안서 영역이 빈 박스로 보임.
+  <pre style="margin-top:0.6em;"><code>cd &lt;본인 9주차 리포&gt;
+python -m http.server 8000
+# 브라우저: http://localhost:8000</code></pre>
+</div>
+
+<h3>4-2. index.html placeholder 교체 (본인 프로젝트로)</h3>
+
+<p>덮어쓴 새 <code>index.html</code>은 hero + 데모 카드 안에 <code>[본인 프로젝트 이름]</code>·<code>[프로젝트가 무엇을 하는지 한 줄로]</code>·<code>&lt;본인 GitHub username&gt;/&lt;본인 프로젝트 리포&gt;</code> 같은 placeholder가 박혀있다. 본인 기말 프로젝트 값으로 교체.</p>
+
+<table>
+  <tr><th>위치</th><th>교체할 값</th></tr>
+  <tr><td><code>&lt;title&gt;</code></td><td>본인 프로젝트 이름 + 본인 익명 ID</td></tr>
+  <tr><td>hero <code>&lt;h1&gt;</code> + <code>.tagline</code></td><td>프로젝트 이름 + 한 줄 요약</td></tr>
+  <tr><td>데모 카드 <code>screenshot.png</code></td><td>본인 데모 화면 캡쳐. 아직 없으면 placeholder 이미지 유지 (구현 후 교체)</td></tr>
+  <tr><td>Live Demo <code>&lt;a href&gt;</code></td><td>현 시점에는 <code>"#"</code> 유지 + <code>Coming soon</code> 뱃지. § 5-6 또는 13주차에 본인 Live URL로 교체</td></tr>
+  <tr><td>Source on GitHub <code>&lt;a href&gt;</code></td><td>본인 기말 프로젝트 리포 URL (HF 트랙은 § 5-1에서 만든 신규 리포, OCI 트랙은 10주차 칼로리카운터 리포 또는 신규 리포)</td></tr>
+</table>
+
+<p>본문은 <code>&lt;zero-md src="contents.md"&gt;</code>가 contents.md를 자동 렌더하므로 손댈 곳 없음. contents.md만 갱신하면 본인 페이지가 따라온다.</p>
+
+<pre><code>git add index.html
+git commit -m "feat: 9주차 페이지 placeholder를 기말 프로젝트로 교체"
+git push origin main</code></pre>
+
+<p class="small">Live Demo URL 확정 시점: HF 트랙은 § 5-6 (오늘 안), OCI 트랙은 13주차 본인 기말 배포 완료 시. URL 패턴 — OCI는 <code>&lt;id&gt;-demo.aiweb2026.site/final</code>, HF는 <code>https://&lt;id&gt;-final-&lt;slug&gt;.hf.space</code> (전체화면 직접 앱 URL).</p>
+
+<h2 id="s5">5. HF Spaces 폴백 인프라 구축 (45분)</h2>
+
+<p>OCI 미완 학생 필수. OCI 완료 학생은 그대로 본인 사이트 사용. 학습용으로 따라해도 OK (학기 후 카드 없이 유지 가능한 대안 확보).</p>
+
+<div class="why">
+  <strong>repo 2개 구조 — GitHub이 source of truth, HF Space는 deploy target.</strong>
+  <pre style="margin-top:0.6em;background:#fff7ed;color:var(--ink);border:1px solid var(--accent);"><code>[학생] → GitHub repo (코드 + Actions)
+       ↓ git push origin main
+   GitHub Actions (sync-to-hf.yml)
+       ↓ force push
+   HF Space repo (Docker 빌드 + 호스팅)
+       ↓
+   https://&lt;id&gt;-&lt;repo&gt;.hf.space</code></pre>
+  학생은 GitHub만 만진다. HF Space repo는 CI가 자동 동기화. HF Space에 직접 push해도 동작은 하지만 GitHub-first 채택 이유 — 9~10주차 흐름과 일관 + github.dev 편집 + Actions 로그 디버깅 + PR/Issues.
+</div>
+
+<h3>5-1. hf_starter 폴더 → 신규 GitHub 리포에 복사</h3>
+
+<p>§ 0의 <code>hf_starter/</code> 폴더는 다음 구조다. 6주차 칼로리카운터 코드 + Dockerfile (포트 7860) + GitHub Actions sync가 모두 들어있어 본인이 직접 5-3·5-4를 작성할 필요 없다.</p>
+
+<pre><code>hf_starter/
+├── app.py                              ← 6주차 칼로리카운터 (Gradio)
+├── model_config.py                     ← 모델 상수 + InferenceClient
+├── requirements.txt
+├── Dockerfile                          ← 포트 7860 (HF Space용)
+├── .env.example                        ← HF_TOKEN 자리 (로컬 테스트용)
+├── .gitignore                          ← .env 차단
+├── README.md                           ← 상세 가이드
+└── .github/
+    └── workflows/
+        └── sync-to-hf.yml              ← push → HF Space 자동 sync</code></pre>
+
+<p>본인 GitHub에 신규 리포(예: <code>{본인_리포_이름}</code>) 생성 → clone → <code>hf_starter/</code> 폴더 내용 전부 복사:</p>
+
+<pre><code>git clone https://github.com/&lt;본인&gt;/{본인_리포_이름}.git
+cd {본인_리포_이름}
+
+# 일반 파일 + 숨김 파일까지 모두 복사
+cp -r &lt;수업자료&gt;/week11/hf_starter/* .
+cp -r &lt;수업자료&gt;/week11/hf_starter/.github .
+cp &lt;수업자료&gt;/week11/hf_starter/.gitignore .
+cp &lt;수업자료&gt;/week11/hf_starter/.env.example .
+
+# 첫 push (워크플로우는 다음 단계에서 본인 값 교체 후 작동)
+git add .
+git commit -m "init: 11주차 HF 폴백 스타터"
+git push origin main</code></pre>
+
+<p class="small"><code>.github/</code>·<code>.gitignore</code>·<code>.env.example</code>은 점 파일. § 0 숨김 파일 안내대로 빠지지 않게 복사할 것.</p>
+
+<h3>5-2. HF 계정 + Access Token</h3>
+
+<ol>
+  <li><a href="https://huggingface.co/join">huggingface.co/join</a> 가입 (이메일·비밀번호·사용자 이름. 본인 GitHub username과 같으면 편하다)</li>
+  <li>이메일 인증 → <a href="https://huggingface.co/settings/tokens">Settings → Tokens</a>에서 Access Token 발급
+    <ul>
+      <li>Token type: <strong>Write</strong> (Read 토큰은 push 불가)</li>
+      <li>이름: <code>aiweb2026-deploy</code> 등 자유</li>
+      <li>발급된 <code>hf_...</code> 토큰을 안전한 곳에 임시 저장. 노출 금지.</li>
+    </ul>
+  </li>
+</ol>
+
+<img class="shot" src="images/week06/10_write_token.png" alt="HuggingFace Create new Access Token 화면 — Write 타입 선택">
+<p class="shot-caption">
+<span class="num-circle nc-r">1</span> Token type에서 <strong>Write</strong> 선택 (Read는 push 불가) &nbsp;
+<span class="num-circle nc-b">2</span> Token name 입력 (<code>aiweb2026-deploy</code> 등) &nbsp;
+<span class="num-circle nc-g">3</span> <strong>Create token</strong> 클릭 → 발급된 <code>hf_...</code> 값 복사 후 안전한 곳에 임시 저장</p>
+
+<div class="danger">
+  <strong>토큰 노출 금지.</strong> Create token 직후 1회만 전체 값이 보인다. 화면을 떠나면 다시 못 본다. 코드·Git·Slack·DM에 절대 붙여넣지 말 것. 노출됐으면 <a href="https://huggingface.co/settings/tokens">tokens 페이지</a>에서 즉시 Revoke.
+</div>
+
+<h3>5-3. Space 생성 (Docker 모드)</h3>
+
+<p><a href="https://huggingface.co/new-space">huggingface.co/new-space</a> 접속 → 폼을 위에서 아래로 채운다.</p>
+
+<img class="shot" src="images/week06/06_new_space.png" alt="Create a new Space 폼 — Docker SDK 선택, Public Visibility">
+<p class="shot-caption">Create a new Space 폼 전체. 박스 6개를 ①~⑥ 순서로 채운다.</p>
+
+<table>
+  <tr><th>번호</th><th>항목</th><th>11주차 입력값</th></tr>
+  <tr><td><span class="num-circle nc-r">1</span></td><td>Owner · Space name · Short description</td><td>Owner=본인 사용자명, Space name=<code>{본인_리포_이름}</code> 등 (영문 소문자 + 하이픈), description은 자유</td></tr>
+  <tr><td><span class="num-circle nc-o">2</span></td><td>License</td><td><code>mit</code> 또는 본인 선택</td></tr>
+  <tr><td><span class="num-circle nc-b">3</span></td><td>Select the Space SDK</td><td><strong>Docker</strong> 클릭 → 하위 템플릿 중 <strong>Blank</strong> 선택</td></tr>
+  <tr><td><span class="num-circle nc-g">4</span></td><td>Space hardware</td><td><code>CPU Basic · 2 vCPU · 16 GB RAM · FREE</code> (기본값 그대로)</td></tr>
+  <tr><td><span class="num-circle nc-p">5</span></td><td>Visibility</td><td><strong>Public</strong></td></tr>
+  <tr><td><span class="num-circle nc-pk">6</span></td><td>Create Space</td><td>클릭 → Space 페이지 <code>huggingface.co/spaces/&lt;id&gt;/&lt;repo&gt;</code> 생성. 평가에 쓸 <strong>Live URL은 전체화면 직접 앱 URL</strong> <code>https://&lt;id&gt;-&lt;repo&gt;.hf.space</code> (Space 페이지 우상단 ⋮ → <strong>Embed this Space</strong> → <em>Direct URL</em>에서 확인).</td></tr>
+</table>
+
+<h3>5-4. Dockerfile 포트 확인 (이미 7860)</h3>
+
+<p>동봉 Dockerfile은 HF Space 기본 포트 7860으로 이미 설정돼 있다. 직접 만들지 말고 그대로 사용.</p>
+
+<pre><code># 동봉 Dockerfile 핵심 라인
+EXPOSE 7860
+CMD ["python", "app.py"]   # Gradio는 7860 기본</code></pre>
+
+<p class="small">참고: 10주차 OCI용 Dockerfile은 보통 8000번 포트(uvicorn). HF Space는 7860만 받기 때문에 동봉본은 별도 버전. nginx·docker-compose·cert/는 HF 트랙에서 사용 안 함 (HTTPS·도메인을 HF가 자동 제공).</p>
+
+<div class="danger">
+  <strong>README.md YAML frontmatter 필수.</strong> HF Space는 README.md 맨 위 YAML frontmatter를 Space 설정으로 읽는다. 없으면 <em>"Configuration error — Missing configuration in README"</em> 에러로 빌드 실패. <code>hf_starter/README.md</code>에 동봉돼 있으니 그대로 push하면 된다. 본인 프로젝트로 바꿀 때 <code>title</code>·<code>emoji</code>·<code>colorFrom</code>·<code>colorTo</code>만 교체. <code>sdk: docker</code>·<code>app_port: 7860</code>은 유지.
+  <pre style="margin-top:0.6em;"><code>---
+title: Calorie Counter
+emoji: 🍱
+colorFrom: yellow
+colorTo: red
+sdk: docker
+app_port: 7860
+pinned: false
+---</code></pre>
+  <p class="small" style="margin:0.5em 0 0;"><code>colorFrom</code>·<code>colorTo</code> 허용값 8개만 가능: <code>red</code>·<code>yellow</code>·<code>green</code>·<code>blue</code>·<code>indigo</code>·<code>purple</code>·<code>pink</code>·<code>gray</code>. <code>orange</code>·<code>brown</code> 등 입력 시 HF가 push 거부.</p>
+</div>
+
+<h3>5-5. GitHub Actions로 자동 sync</h3>
+
+<p><code>git push origin main</code> 한 번으로 HF Space가 자동 빌드되도록 한다. 동봉 워크플로우(<code>.github/workflows/sync-to-hf.yml</code>)를 본인 값으로 교체 + Secret 등록.</p>
+
+<p><strong>1) GitHub Secret 등록</strong> — 본인 GitHub 리포 → Settings → Secrets and variables → Actions → New repository secret</p>
+
+<ul>
+  <li>Name: <code>HF_TOKEN</code></li>
+  <li>Value: 5-2에서 받은 <code>hf_...</code> 토큰</li>
+</ul>
+
+<p><strong>2) 워크플로우 env 본인 값으로 교체</strong> — <code>.github/workflows/sync-to-hf.yml</code> 안의 <code>HF_USER</code>·<code>HF_SPACE</code>를 본인 값으로.</p>
+
+<pre><code>env:
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  HF_USER: &lt;id&gt;           # ← 본인 HF username
+  HF_SPACE: &lt;repo&gt;        # ← 본인 HF Space 이름 (5-3에서 만든 Space name)</code></pre>
+
+<p><strong>3) commit + push</strong></p>
+
+<pre><code>git commit -am "feat: HF_USER, HF_SPACE 본인 값으로 교체"
+git push origin main</code></pre>
+
+<p>GitHub 리포 → Actions 탭에서 워크플로우 녹색 확인 → 1~3분 후 HF Space URL에 본인 앱 떠 있음.</p>
+
+<h3>5-6. 9주차 페이지의 Live Demo 버튼 살리기</h3>
+
+<p>9주차 페이지의 데모 카드 버튼이 placeholder 상태일 것. <strong>전체화면 직접 앱 URL</strong>(<code>https://&lt;id&gt;-&lt;repo&gt;.hf.space</code>)로 교체. Space 페이지(<code>huggingface.co/spaces/...</code>)는 HF 헤더·사이드바가 함께 떠서 데모 카드 링크로는 부적합 — 직접 앱 URL이 풀스크린으로 본인 앱만 보여준다.</p>
+
+<pre><code>&lt;!-- 변경 전 --&gt;
+&lt;a href="#" class="btn-disabled"&gt;Live Demo (Coming Week 10)&lt;/a&gt;
+
+&lt;!-- 변경 후 --&gt;
+&lt;a href="https://&lt;id&gt;-&lt;repo&gt;.hf.space" class="btn-primary" target="_blank" rel="noopener"&gt;Live Demo&lt;/a&gt;</code></pre>
+
+<p class="small"><code>&lt;id&gt;-&lt;repo&gt;</code>는 본인 HF username과 Space name을 하이픈으로 이은 형태. 예: <code>username</code> + <code>calorie-counter</code> → <code>https://username-calorie-counter.hf.space</code>. 정확한 URL은 Space 페이지 우상단 ⋮ → <strong>Embed this Space</strong> → <em>Direct URL</em>에 표시된다. <code>class</code>는 본인 페이지의 활성 버튼 클래스로 교체 (<code>btn-primary</code>·<code>btn</code>·<code>button</code> 등). push 후 Cloudflare Pages가 1~2분 안에 자동 배포.</p>
+
+<h3>자주 막히는 곳 (top 3)</h3>
+
+<table>
+  <tr><th>증상</th><th>확인</th></tr>
+  <tr>
+    <td>HF Space "Build failed"</td>
+    <td>Space → Logs → Build. <code>requirements.txt</code> 버전 충돌, 7860 포트 미노출, root 권한 문제</td>
+  </tr>
+  <tr>
+    <td>빌드는 됐는데 페이지 안 뜸</td>
+    <td>Space → Logs → Container. <code>app.py</code>가 <code>0.0.0.0</code> 바인딩인지, 포트 7860인지, 환경변수 누락 여부</td>
+  </tr>
+  <tr>
+    <td>GitHub Actions <code>403</code> / Permission denied</td>
+    <td><code>HF_TOKEN</code> Secret 값 일치 여부, 토큰 type이 Write인지, 워크플로우의 <code>HF_USER</code>·<code>HF_SPACE</code> 교체 여부</td>
+  </tr>
+  <tr>
+    <td>Actions 녹색이지만 HF <em>"Configuration error — Missing configuration in README"</em></td>
+    <td><code>README.md</code> 맨 위 YAML frontmatter 누락. § 5-4 박스의 8줄을 <code>README.md</code> 최상단에 추가 → commit → push (Actions가 다시 동기화)</td>
+  </tr>
+</table>
+
+<p><strong>로그 화면 보는 법</strong> — Space 상단 <strong>App</strong> 탭에서 상태 뱃지와 로그 패널을 함께 본다.</p>
+
+<img class="shot" src="images/week06/09_app_logs.png" alt="HuggingFace Space App 탭 — 상태 뱃지 + 로그 패널">
+<p class="shot-caption">
+<span class="num-circle nc-r">1</span> 상단 상태 뱃지 (Running / Building / Stopped 등) &nbsp;
+<span class="num-circle nc-b">2</span> 로그 종류 탭 (Build / Container / Logs) &nbsp;
+<span class="num-circle nc-g">3</span> 실제 로그 패널 — 빌드 실패 원인은 여기서 찾는다</p>
+
+<table>
+  <tr><th>번호</th><th>볼 곳</th><th>흔한 신호</th></tr>
+  <tr><td><span class="num-circle nc-r">1</span></td><td>상태 뱃지</td><td><code>Build failed</code>(빨강) → 2번 <strong>Build</strong> 탭 / <code>Runtime error</code> → 2번 <strong>Container</strong> 탭</td></tr>
+  <tr><td><span class="num-circle nc-b">2</span></td><td>로그 탭</td><td><strong>Build</strong>: requirements 설치·Docker 빌드 / <strong>Container</strong>: <code>app.py</code> 실행 후 stdout·stderr</td></tr>
+  <tr><td><span class="num-circle nc-g">3</span></td><td>로그 패널</td><td><code>ModuleNotFoundError</code> → requirements.txt 누락. <code>Address already in use</code>·<code>EXPOSE</code> 관련 메시지 → 포트 7860 확인</td></tr>
+</table>
+
+<h3>OCI vs HF 비교</h3>
+
+<table>
+  <tr><th>항목</th><th>OCI</th><th>HF</th></tr>
+  <tr><td>Live URL</td><td><code>&lt;id&gt;-demo.aiweb2026.site</code></td><td><code>&lt;id&gt;-&lt;repo&gt;.hf.space</code> (전체화면 직접 앱)</td></tr>
+  <tr><td>본인 도메인</td><td>사용</td><td>사용 안 함</td></tr>
+  <tr><td>HTTPS·인증서</td><td>Let's Encrypt 직접</td><td>HF 자동 제공</td></tr>
+  <tr><td>상시 가동</td><td>24/7</td><td>48h inactive 시 sleep</td></tr>
+  <tr><td>RAM</td><td>1GB + swap</td><td>16GB</td></tr>
+  <tr><td>카드</td><td>가입 시 필요</td><td>불필요</td></tr>
+</table>
+
+<h2 id="s6">6. 마무리 (5분)</h2>
+
+<h3>오늘 끝났을 때 체크</h3>
+
+<ul class="checklist">
+  <li><code>contents.md</code> v1이 본인 페이지(<code>&lt;id&gt;.aiweb2026.site</code>)에 렌더됨</li>
+  <li>강사 댓글 받은 경우 반영 (즉시 반영 또는 다음 수업까지 v2)</li>
+  <li>9주차 페이지 <code>index.html</code> placeholder를 본인 기말 프로젝트 값으로 교체</li>
+  <li>본인 트랙 (A/B/C/자유) 확정</li>
+  <li>HF 트랙 학생: HF Space Live URL 작동 + 9주차 Live Demo 링크 교체</li>
+</ul>
+
+<h3>다음 수업 전까지 자습</h3>
+
+<table>
+  <tr>
+    <th>대상</th>
+    <th>해야 할 일</th>
+  </tr>
+  <tr>
+    <td>HF 트랙 학생 (수업 중 § 5 못 끝낸 경우)</td>
+    <td>§ 5 완주 → HF Space Live URL 확보 → 9주차 Live Demo 링크 교체</td>
+  </tr>
+  <tr>
+    <td>강사 댓글에서 보완 받은 학생</td>
+    <td>댓글 반영해 <code>contents.md</code> v2 작성 → 본인 리포에 commit</td>
+  </tr>
+</table>
+
+</div>
+</body>
+</html>
