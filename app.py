@@ -419,7 +419,7 @@ input, select, textarea, .input-wrap {
 }
 """
 
-with gr.Blocks(title="AI 국내 여행 도우미") as demo:
+with gr.Blocks(title="AI 국내 여행 도우미", theme=gr.themes.Soft(), css=CSS) as demo:
     gr.Markdown("# 🗺️ AI 국내 여행 도우미\n> MBTI 기반 여행지 추천 + 일정 자동 생성 + PDF 다운로드")
 
     with gr.Row(equal_height=False):
@@ -490,4 +490,4 @@ with gr.Blocks(title="AI 국내 여행 도우미") as demo:
 
 if __name__ == "__main__":
     import tempfile
-    demo.launch(theme=gr.themes.Soft(), css=CSS, allowed_paths=[tempfile.gettempdir()])
+    demo.launch(allowed_paths=[tempfile.gettempdir()])
