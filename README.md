@@ -235,7 +235,7 @@ Spaces > Settings > Repository secrets > New secret
 
 | 변수명 | 필수 | 설명 |
 |--------|------|------|
-| `HF_TOKEN` | ✅ | HuggingFace API 토큰. Qwen2.5-72B-Instruct 모델 호출에 사용 |
+| `TOKEN` | ✅ | OpenAI 모델 호출에 사용 |
 
 ---
 
