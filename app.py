@@ -469,7 +469,7 @@ with gr.Blocks(title="AI 국내 여행 도우미") as demo:
             sched_output = gr.HTML("")
             pdf_link_output = gr.HTML("")
             pdf_output   = gr.File(
-                label="📥 일정표 PDF (백업 다운로드)",
+                label="📥 일정표 PDF (다운로드)",
                 visible=False,
                 file_types=[".pdf"],
             )
