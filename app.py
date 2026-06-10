@@ -315,21 +315,86 @@ def run_all(
 
         # PDF
         pdf_path = _make_pdf(data)
+        top_dest = data.get("top_destination", "여행지")
 
-        return rec_html, sched_html, gr.update(visible=bool(pdf_path), value=pdf_path)
+        if pdf_path:
+            filename = os.path.basename(pdf_path)
+            pdf_link_html = f'''<div class="pdf-download-link" style="margin-top:16px">
+  <a href="/file={pdf_path}" download="{top_dest}_여행일정표.pdf">
+    📥 {top_dest}_여행일정표.pdf — 클릭하여 다운로드
+  </a>
+</div>'''
+        else:
+            pdf_link_html = ""
+
+        return rec_html, sched_html, pdf_link_html, gr.update(visible=bool(pdf_path), value=pdf_path)
 
     except json.JSONDecodeError as e:
-        return f"<p>❌ 응답 파싱 오류: {e}</p>", "", gr.update(visible=False, value=None)
+        return f"<p>❌ 응답 파싱 오류: {e}</p>", "", "", gr.update(visible=False, value=None)
     except Exception as e:
-        return f"<p>❌ 오류: {e}</p>", "", gr.update(visible=False, value=None)
+        return f"<p>❌ 오류: {e}</p>", "", "", gr.update(visible=False, value=None)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Gradio UI  (단일 페이지)
 # ══════════════════════════════════════════════════════════════════════════════
 CSS = """
+/* 다크모드 강제 라이트 오버라이드 */
+:root, [data-theme="dark"], .dark {
+    --body-background-fill: #F8FAFF !important;
+    --background-fill-primary: #FFFFFF !important;
+    --background-fill-secondary: #EFF6FF !important;
+    --border-color-primary: #BFDBFE !important;
+    --color-accent: #2563EB !important;
+    --color-accent-soft: #DBEAFE !important;
+    --button-primary-background-fill: #2563EB !important;
+    --button-primary-text-color: #FFFFFF !important;
+    --block-title-text-color: #1E3A8A !important;
+    --body-text-color: #1E293B !important;
+    --block-label-text-color: #1E3A8A !important;
+    --input-background-fill: #FFFFFF !important;
+    --input-border-color: #93C5FD !important;
+    --checkbox-background-color: #FFFFFF !important;
+}
+body, .gradio-container {
+    background: #F8FAFF !important;
+    color: #1E293B !important;
+}
 .gradio-container { max-width: 1200px !important; margin: auto !important; }
 footer { display: none !important; }
+label, .label-wrap span, .svelte-1gfkn6j {
+    color: #1E3A8A !important;
+}
+.block, .form {
+    background: #FFFFFF !important;
+    border-color: #BFDBFE !important;
+}
+input, select, textarea, .input-wrap {
+    background: #FFFFFF !important;
+    color: #1E293B !important;
+    border-color: #93C5FD !important;
+}
+.radio-group label, .checkbox-group label {
+    color: #1E293B !important;
+}
+/* PDF 다운로드 링크 스타일 */
+.pdf-download-link a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #EFF6FF;
+    border: 2px solid #3B82F6;
+    border-radius: 10px;
+    padding: 12px 20px;
+    color: #1D4ED8 !important;
+    font-size: 15px;
+    font-weight: bold;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+.pdf-download-link a:hover {
+    background: #DBEAFE;
+}
 """
 
 with gr.Blocks(title="AI 국내 여행 도우미") as demo:
@@ -368,10 +433,11 @@ with gr.Blocks(title="AI 국내 여행 도우미") as demo:
         # ── 오른쪽: 결과 ────────────────────────────────────────────────────
         with gr.Column(scale=1, min_width=500):
             gr.Markdown("### 🎯 추천 결과 & 여행 일정")
-            rec_output   = gr.HTML("<p style='color:#6B7280'>← 왼쪽 정보를 모두 입력하고 버튼을 눌러주세요!</p>")
+            rec_output   = gr.HTML("<p style='color:#1E40AF'>← 왼쪽 정보를 모두 입력하고 버튼을 눌러주세요!</p>")
             sched_output = gr.HTML("")
+            pdf_link_output = gr.HTML("")
             pdf_output   = gr.File(
-                label="📥 일정표 PDF 다운로드",
+                label="📥 일정표 PDF (백업 다운로드)",
                 visible=False,
                 file_types=[".pdf"],
             )
@@ -386,7 +452,7 @@ with gr.Blocks(title="AI 국내 여행 도우미") as demo:
     btn.click(
         fn=run_all,
         inputs=[count] + member_inputs + [duration, region, themes_input],
-        outputs=[rec_output, sched_output, pdf_output],
+        outputs=[rec_output, sched_output, pdf_link_output, pdf_output],
     )
 
 if __name__ == "__main__":
