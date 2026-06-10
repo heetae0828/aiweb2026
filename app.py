@@ -251,15 +251,18 @@ def run_all(
     if (not region or region == "(선택 안 함)") and not themes:
         return "❌ 지역 또는 테마 중 하나 이상 선택해주세요.", "", gr.update(visible=False, value=None)
 
-    api_key = os.getenv("OPENAI_API_KEY", "")
+    api_key = os.getenv("HF_TOKEN", "")
     if not api_key:
-        return "❌ OPENAI_API_KEY가 설정되지 않았습니다.", "", gr.update(visible=False, value=None)
+        return "❌ HF_TOKEN이 설정되지 않았습니다.", "", gr.update(visible=False, value=None)
 
     try:
-        client = OpenAI(api_key=api_key)
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://api-inference.huggingface.co/v1/",
+        )
         prompt = _build_prompt(active, duration, region, themes)
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="Qwen/Qwen2.5-72B-Instruct",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=4096,
         )
