@@ -25,15 +25,16 @@ MBTI_LIST = [
     "ESTP", "ESFP", "ENFP", "ENTP",
     "ESTJ", "ESFJ", "ENFJ", "ENTJ",
 ]
-REGIONS = [
-    "(선택 안 함)",
-    "서울", "경기", "인천",
-    "강릉", "속초", "평창", "춘천",
-    "대전", "청주", "공주", "충주",
-    "전주", "광주", "여수", "순천", "목포",
-    "부산", "대구", "경주", "안동", "통영", "거제",
-    "제주시", "서귀포",
-]
+REGION_TREE = {
+    "(선택 안 함)": [],
+    "서울/경기/인천": ["서울", "인천", "수원", "성남", "고양", "부천", "안산", "안양", "용인", "광명", "평택", "시흥", "파주", "의정부", "김포", "하남", "광주", "양주", "구리", "남양주", "화성", "이천", "여주", "가평", "양평"],
+    "강원": ["춘천", "강릉", "원주", "속초", "동해", "태백", "삼척", "홍천", "횡성", "평창", "정선", "철원", "화천", "양구", "인제", "고성", "양양"],
+    "충청": ["대전", "청주", "충주", "천안", "아산", "공주", "보령", "서산", "논산", "계룡", "당진", "제천", "단양", "음성", "진천", "괴산", "증평", "세종"],
+    "전라": ["광주", "전주", "익산", "군산", "정읍", "남원", "김제", "목포", "여수", "순천", "나주", "광양", "담양", "곡성", "구례", "고흥", "보성", "화순", "장흥", "강진", "해남", "영암", "무안", "함평", "영광", "장성", "완도", "진도", "신안"],
+    "경상": ["부산", "대구", "울산", "경주", "포항", "안동", "구미", "영주", "영천", "상주", "문경", "경산", "창원", "진주", "통영", "사천", "김해", "밀양", "거제", "양산", "의령", "함안", "창녕", "고성", "남해", "하동", "산청", "함양", "거창", "합천"],
+    "제주": ["제주"],
+}
+REGION_PROVINCES = list(REGION_TREE.keys())
 THEMES = ["자연/힐링", "맛집 탐방", "역사/문화", "액티비티/스포츠", "도시/쇼핑", "야경/감성", "온천/스파"]
 MBTI_TRAITS = {
     "ISTJ": "계획적이고 꼼꼼함. 역사 유적지, 박물관, 전통문화 체험 선호. 검증된 맛집과 안정적인 일정 중시",
@@ -80,6 +81,13 @@ plt.rcParams["axes.unicode_minus"] = False
 # ── UI 헬퍼 ─────────────────────────────────────────────────────────────────
 def update_rows(count: int):
     return [gr.update(visible=(i < int(count))) for i in range(4)]
+
+
+def update_city_dropdown(province: str):
+    cities = REGION_TREE.get(province, [])
+    if not cities:
+        return gr.update(choices=[], value=None, visible=False)
+    return gr.update(choices=["(선택 안 함)"] + cities, value="(선택 안 함)", visible=True)
 
 
 # ── 통합 프롬프트 ────────────────────────────────────────────────────────────
@@ -233,7 +241,7 @@ def run_all(
     mbti2, gender2, age2,
     mbti3, gender3, age3,
     mbti4, gender4, age4,
-    duration, region, themes,
+    duration, province, city, themes,
 ):
     all_data = [
         (mbti1, gender1, age1), (mbti2, gender2, age2),
@@ -243,17 +251,24 @@ def run_all(
     for i in range(int(count)):
         mbti, gender, age = all_data[i]
         if not mbti:
-            return f"❌ 멤버{i+1}의 MBTI를 선택해주세요.", "", gr.update(visible=False, value=None)
+            return f"❌ 멤버{i+1}의 MBTI를 선택해주세요.", "", "", gr.update(visible=False, value=None)
         if not age or age <= 0:
-            return f"❌ 멤버{i+1}의 나이를 입력해주세요.", "", gr.update(visible=False, value=None)
+            return f"❌ 멤버{i+1}의 나이를 입력해주세요.", "", "", gr.update(visible=False, value=None)
         active.append((mbti, gender, age))
 
-    if (not region or region == "(선택 안 함)") and not themes:
-        return "❌ 지역 또는 테마 중 하나 이상 선택해주세요.", "", gr.update(visible=False, value=None)
+    # 선택된 지역 결정: 시/군 선택 시 우선, 없으면 도/광역 사용
+    region = ""
+    if city and city != "(선택 안 함)":
+        region = city
+    elif province and province != "(선택 안 함)":
+        region = province
+
+    if not region and not themes:
+        return "❌ 지역 또는 테마 중 하나 이상 선택해주세요.", "", "", gr.update(visible=False, value=None)
 
     api_key = os.getenv("HF_TOKEN", "")
     if not api_key:
-        return "❌ HF_TOKEN이 설정되지 않았습니다.", "", gr.update(visible=False, value=None)
+        return "❌ HF_TOKEN이 설정되지 않았습니다.", "", "", gr.update(visible=False, value=None)
 
     try:
         client = OpenAI(
@@ -339,6 +354,13 @@ def run_all(
 # Gradio UI  (단일 페이지)
 # ══════════════════════════════════════════════════════════════════════════════
 CSS = """
+/* MBTI 드롭다운 열렸을 때 페이지 스크롤 방지 */
+.gradio-dropdown .dropdown-arrow { pointer-events: none; }
+ul[role="listbox"] {
+    max-height: 240px !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+}
 /* 다크모드 강제 라이트 오버라이드 */
 :root, [data-theme="dark"], .dark {
     --body-background-fill: #F8FAFF !important;
@@ -425,7 +447,17 @@ with gr.Blocks(title="AI 국내 여행 도우미") as demo:
 
             # STEP 3
             gr.Markdown("### 📍 STEP 3. 지역 또는 테마 *(하나 이상 필수)*")
-            region       = gr.Dropdown(choices=REGIONS, value="(선택 안 함)", label="지역 선택")
+            province_input = gr.Dropdown(
+                choices=REGION_PROVINCES,
+                value="(선택 안 함)",
+                label="① 도/광역시 선택",
+            )
+            city_input = gr.Dropdown(
+                choices=[],
+                value=None,
+                label="② 시/군 선택 (선택 사항)",
+                visible=False,
+            )
             themes_input = gr.CheckboxGroup(choices=THEMES, label="테마 선택")
 
             btn = gr.Button("✈️  추천 + 일정 생성하기", variant="primary", size="lg")
@@ -444,6 +476,7 @@ with gr.Blocks(title="AI 국내 여행 도우미") as demo:
 
     # ── 이벤트 ──────────────────────────────────────────────────────────────
     count.change(fn=update_rows, inputs=[count], outputs=rows)
+    province_input.change(fn=update_city_dropdown, inputs=[province_input], outputs=[city_input])
 
     member_inputs = []
     for i in range(4):
@@ -451,7 +484,7 @@ with gr.Blocks(title="AI 국내 여행 도우미") as demo:
 
     btn.click(
         fn=run_all,
-        inputs=[count] + member_inputs + [duration, region, themes_input],
+        inputs=[count] + member_inputs + [duration, province_input, city_input, themes_input],
         outputs=[rec_output, sched_output, pdf_link_output, pdf_output],
     )
 
