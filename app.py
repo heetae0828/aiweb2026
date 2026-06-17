@@ -599,21 +599,24 @@ def run_all(
                     rec_html += f'<h3 style="color:#1E40AF;margin:14px 0 8px">{icon} {cat}</h3>'
 
                     def _item_card(item):
-                        name    = item.get("name", "")
-                        addr    = item.get("address", "")
-                        desc    = item.get("desc", "")
-                        price   = item.get("price", "")
-                        # 네이버 API link 우선, 없으면 네이버 플레이스 검색
-                        place_url = (
-                            item.get("link")
-                            or f"https://map.naver.com/p/search/{urllib.parse.quote((name+' '+addr).strip())}"
-                        )
+                        name  = item.get("name", "")
+                        addr  = item.get("address", "")
+                        desc  = item.get("desc", "")
+                        price = item.get("price", "")
+                        # 네이버 API link 우선, 없으면 이름으로만 검색 (addr 제외)
+                        raw_link  = item.get("link", "")
+                        place_url = raw_link if raw_link else f"https://map.naver.com/p/search/{urllib.parse.quote(name)}"
                         return f"""<div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px">
-  <div style="font-weight:bold;font-size:13.5px;margin-bottom:2px">
-    <a href="{place_url}" target="_blank" style="color:#92400E;text-decoration:none">{name} 📍</a>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+    <span style="font-weight:bold;font-size:13.5px;color:#1E293B">{name}</span>
+    <a href="{place_url}" target="_blank"
+       style="display:inline-block;background:#03C75A;color:white;font-size:11px;font-weight:bold;
+              padding:3px 8px;border-radius:4px;text-decoration:none;white-space:nowrap;flex-shrink:0">
+      N 네이버 플레이스에서 보기
+    </a>
   </div>
-  <div style="font-size:12px;color:#6B7280;margin-bottom:4px">{addr}</div>
-  <div style="font-size:12.5px;color:#374151;margin-bottom:4px">{desc}</div>
+  <div style="font-size:12px;color:#6B7280;margin-bottom:3px">📍 {addr}</div>
+  <div style="font-size:12.5px;color:#374151;margin-bottom:3px">{desc}</div>
   {"<div style='font-size:12px;font-weight:bold;color:#B45309'>"+price+"</div>" if price else ""}
 </div>"""
 
