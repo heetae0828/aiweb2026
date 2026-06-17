@@ -245,12 +245,17 @@ def _build_prompt(members, duration_label, n_days, region, themes, real_attracti
     stay_rule = ""
     if has_stay:
         stay_rule = """
-- accommodation: 추천 숙소 3곳의 name(숙소명), area(위치 동네), type(펜션/호텔/게스트하우스 등), price_per_night(1박 가격대) 포함."""
+- accommodation: 숙박 추천 3곳.
+  ※ 중요: name(숙소명)은 절대 창작하지 마세요. 여기어때(yeogi.com)에서 실제 검색되는 숙소명만 사용하세요.
+    확신할 수 없으면 name을 빈 문자열("")로 두고 area와 type만 채우세요.
+  - area: 숙박할 동네/지역명 (예: 전주 한옥마을, 강릉 경포대, 제주 애월)
+  - type: 숙소 유형 (펜션/호텔/게스트하우스/리조트/모텔 중 선택)
+  - price_per_night: 대략적인 1박 가격대 (예: 5~10만원, 10~20만원)"""
         stay_schema = """,
   "accommodation": [
-    {"name": "숙소명", "area": "위치", "type": "숙소유형", "price_per_night": "가격대"},
-    {"name": "숙소명", "area": "위치", "type": "숙소유형", "price_per_night": "가격대"},
-    {"name": "숙소명", "area": "위치", "type": "숙소유형", "price_per_night": "가격대"}
+    {"name": "", "area": "숙박 지역명", "type": "숙소유형", "price_per_night": "가격대"},
+    {"name": "", "area": "숙박 지역명", "type": "숙소유형", "price_per_night": "가격대"},
+    {"name": "", "area": "숙박 지역명", "type": "숙소유형", "price_per_night": "가격대"}
   ]"""
     else:
         stay_schema = ""
@@ -662,28 +667,29 @@ def run_all(
     🏠 여기어때에서 찾기
   </a>
 </div>"""
-            # AI 추천 숙소 목록 (다중 지역이면 날짜 분배)
+            # AI 추천 숙소 목록 — 지역명으로만 여기어때 검색 (숙소명은 실제 확인 불가)
             accommodations = data.get("accommodation", [])
             if accommodations:
                 rec_html += '<div style="display:flex;flex-direction:column;gap:8px">'
                 for idx, acc in enumerate(accommodations):
-                    # 숙소마다 체크인 날짜를 일차 순서로 배분
                     acc_ci = (checkin_date + timedelta(days=idx)).strftime("%Y-%m-%d")
                     acc_co = (checkin_date + timedelta(days=idx + 1)).strftime("%Y-%m-%d")
-                    # 마지막 숙소는 checkout까지
                     if idx == len(accommodations) - 1:
                         acc_co = checkout_str
-                    acc_keyword = f"{acc.get('name','')} {acc.get('area','')}"
-                    yeogi_acc = _yeogi_url(acc_keyword, acc_ci, acc_co)
+                    # 숙소명은 창작일 수 있으므로 area(지역명)로만 검색
+                    area = acc.get("area", "") or region or top_dest
+                    yeogi_acc = _yeogi_url(area, acc_ci, acc_co)
                     rec_html += f"""
 <div style="background:#FFF5F5;border-left:4px solid #FF5A5F;padding:10px 14px;border-radius:0 8px 8px 0">
   <div style="font-weight:bold;font-size:14px;margin-bottom:2px">
-    🏨 {acc.get('name','')} <span style="color:#6B7280;font-weight:normal;font-size:12px">({acc.get('area','')} · {acc.get('type','')})</span>
+    🏨 {area} <span style="color:#6B7280;font-weight:normal;font-size:12px">({acc.get('type','')} · {acc.get('price_per_night','')})</span>
   </div>
-  <div style="font-size:12px;color:#6B7280;margin-bottom:4px">체크인 {acc_ci} → 체크아웃 {acc_co}</div>
-  <div style="font-size:13px;color:#374151;margin-bottom:6px">1박 {acc.get('price_per_night','')}</div>
+  <div style="font-size:12px;color:#6B7280;margin-bottom:6px">체크인 {acc_ci} → 체크아웃 {acc_co}</div>
   <a href="{yeogi_acc}" target="_blank"
-     style="font-size:12px;color:#FF5A5F;text-decoration:none">여기어때에서 검색 →</a>
+     style="display:inline-block;background:#FF5A5F;color:white;font-size:12px;font-weight:bold;
+            padding:5px 12px;border-radius:5px;text-decoration:none">
+    🔍 {area} 숙소 여기어때에서 보기
+  </a>
 </div>"""
                 rec_html += '</div>'
 
