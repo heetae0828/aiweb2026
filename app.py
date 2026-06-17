@@ -370,53 +370,78 @@ def _schedule_html(schedule: dict) -> str:
 
 # ── PDF 생성 ─────────────────────────────────────────────────────────────────
 def _make_pdf(data: dict) -> str | None:
+    import textwrap as tw
     schedule = data.get("schedule", {})
     top_dest = data.get("top_destination", "여행지")
     fp_kw    = {"fontproperties": _KO_FONT} if _KO_FONT else {}
 
-    rows, row_colors = [], []
-    COLS = ["시간", "장소", "활동", "상세내용", "이동수단"]
+    # Column wrap widths (chars) and relative widths
+    COLS     = ["시간", "장소", "활동", "상세내용", "이동수단"]
+    COL_W    = [0.07, 0.13, 0.14, 0.50, 0.16]
+    WRAP_AT  = [8,    14,   16,   55,   16]
+    FONT_SZ  = 8.5
+    BASE_H   = 0.032   # figure-fraction height per text line
+
+    def wrap(text: str, width: int) -> str:
+        return "\n".join(tw.wrap(str(text), width=width)) if text else ""
+
+    rows, row_colors, row_heights = [], [], []
 
     for day, events in schedule.items():
         rows.append([day, "", "", "", ""])
         row_colors.append(["#DBEAFE"] * 5)
+        row_heights.append(BASE_H * 1.4)
         for idx, e in enumerate(events):
-            rows.append([e.get(c, "") for c in COLS])
+            wrapped = [wrap(e.get(c, ""), WRAP_AT[j]) for j, c in enumerate(COLS)]
+            max_lines = max(len(cell.split("\n")) for cell in wrapped) if wrapped else 1
+            rows.append(wrapped)
             row_colors.append(["#F0F7FF" if idx % 2 == 0 else "#FFFFFF"] * 5)
+            row_heights.append(BASE_H * max(1, max_lines))
 
     if not rows:
         return None
 
-    fig_h = max(12, len(rows) * 0.38 + 4)
+    total_h_frac = sum(row_heights)
+    header_h = BASE_H * 1.2
+    fig_h = max(10, (total_h_frac + header_h) / 0.94 * 11 + 2)
+
     fig, ax = plt.subplots(figsize=(17, fig_h))
     ax.axis("off")
 
-    fig.text(0.5, 0.995, f"{top_dest} 여행 일정표",
+    fig.text(0.5, 0.998, f"{top_dest} 여행 일정표",
              ha="center", va="top", fontsize=18, fontweight="bold", **fp_kw)
 
-    col_w = [0.07, 0.13, 0.14, 0.50, 0.16]
-    all_cells = [COLS] + rows
+    all_cells  = [COLS] + rows
     all_colors = [["#1D4ED8"] * 5] + row_colors
 
-    table = ax.table(cellText=all_cells, colWidths=col_w,
-                     loc="center", bbox=[0, 0, 1, 0.94])
+    table = ax.table(cellText=all_cells, colWidths=COL_W,
+                     loc="center", bbox=[0, 0, 1, 0.96])
     table.auto_set_font_size(False)
-    table.set_fontsize(9)
+    table.set_fontsize(FONT_SZ)
 
+    # Header row
     for j in range(5):
         c = table[0, j]
         c.set_facecolor("#1D4ED8")
         c.set_text_props(color="white", fontweight="bold", **fp_kw)
         c.set_edgecolor("#1E40AF")
+        c.set_height(header_h)
 
+    # Data rows
     for i in range(1, len(all_cells)):
-        is_day_row = (all_cells[i][1] == "" and len(all_cells[i][0]) <= 4)
+        is_day_row = (all_cells[i][1] == "" and len(str(all_cells[i][0])) <= 5)
+        h = row_heights[i - 1]
         for j in range(5):
             c = table[i, j]
             c.set_facecolor(all_colors[i][j])
             c.set_edgecolor("#BFDBFE")
-            if is_day_row and j == 0:
-                c.set_text_props(fontweight="bold", color="#1E40AF", **fp_kw)
+            c.set_height(h)
+            if is_day_row:
+                c.set_facecolor("#DBEAFE")
+                if j == 0:
+                    c.set_text_props(fontweight="bold", color="#1E40AF", **fp_kw)
+                else:
+                    c.set_text_props(**fp_kw)
             else:
                 c.set_text_props(**fp_kw)
 
