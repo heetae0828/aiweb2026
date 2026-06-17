@@ -646,6 +646,7 @@ def run_all(
                     "emoji": "🏨",
                     "desc": "수영장·부대시설 완비, 프리미엄 숙박",
                     "price": "평균 15~35만원 / 1박",
+                    "category": "2",
                     "color": "#1D4ED8",
                     "bg": "#EFF6FF",
                     "border": "#93C5FD",
@@ -655,6 +656,7 @@ def run_all(
                     "emoji": "🏡",
                     "desc": "독채·바베큐, 가족·커플 여행 최적",
                     "price": "평균 10~25만원 / 1박",
+                    "category": "3",
                     "color": "#047857",
                     "bg": "#ECFDF5",
                     "border": "#6EE7B7",
@@ -664,9 +666,20 @@ def run_all(
                     "emoji": "🏠",
                     "desc": "합리적 가격, 여행자 네트워킹 최적",
                     "price": "평균 2~6만원 / 1박",
+                    "category": "18",
                     "color": "#92400E",
                     "bg": "#FFFBEB",
                     "border": "#FCD34D",
+                },
+                {
+                    "type": "홈&빌라",
+                    "emoji": "🏘️",
+                    "desc": "독립 공간, 단체·가족 여행 인기",
+                    "price": "평균 15~40만원 / 1박",
+                    "category": "15",
+                    "color": "#6D28D9",
+                    "bg": "#F5F3FF",
+                    "border": "#C4B5FD",
                 },
             ]
             search_area = region or top_dest
@@ -678,10 +691,11 @@ def run_all(
 </p>
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">"""
             for acc in ACC_TYPES:
-                kw = urllib.parse.quote(f"{search_area} {acc['type']}")
+                kw = urllib.parse.quote(search_area)
                 url = (f"https://www.yeogi.com/domestic-accommodations"
-                       f"?keyword={kw}&checkIn={checkin_str}&checkOut={checkout_str}"
-                       f"&personal={actual_count}&typoCorrect=true&nonAffiliated=true")
+                       f"?sortType=RECOMMEND&keyword={kw}"
+                       f"&personal={actual_count}&checkIn={checkin_str}&checkOut={checkout_str}"
+                       f"&typoCorrect=true&nonAffiliated=true&category={acc['category']}")
                 rec_html += f"""
 <div style="background:{acc['bg']};border:1px solid {acc['border']};
             border-radius:10px;padding:14px 16px">
