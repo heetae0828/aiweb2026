@@ -18,7 +18,7 @@ from openai import OpenAI
 matplotlib.use("Agg")
 load_dotenv()
 
-MAX_MEMBERS = 8
+MAX_MEMBERS = 15
 
 # ── 상수 ────────────────────────────────────────────────────────────────────
 MBTI_LIST = [
@@ -81,20 +81,12 @@ plt.rcParams["axes.unicode_minus"] = False
 
 
 # ── UI 헬퍼 ─────────────────────────────────────────────────────────────────
-def compute_count(radio_val, extra_val):
-    if extra_val and int(extra_val) >= 5:
-        return int(extra_val)
-    return int(radio_val) if radio_val else 1
+def compute_count(val):
+    return int(val) if val else 1
 
 
-def update_rows_radio(radio_val):
-    n = int(radio_val) if radio_val else 1
-    updates = [gr.update(visible=(i < n)) for i in range(MAX_MEMBERS)]
-    return updates + [gr.update(value=None)]  # extra_count 초기화
-
-
-def update_rows_extra(extra_val):
-    n = int(extra_val) if extra_val and extra_val >= 5 else 1
+def update_rows_count(val):
+    n = int(val) if val else 1
     return [gr.update(visible=(i < n)) for i in range(MAX_MEMBERS)]
 
 
@@ -260,7 +252,7 @@ def _make_pdf(data: dict) -> str | None:
 
 # ── 메인 함수 ────────────────────────────────────────────────────────────────
 def run_all(
-    radio_count, extra_count_val,
+    count,
     mbti1, gender1, age1,
     mbti2, gender2, age2,
     mbti3, gender3, age3,
@@ -269,14 +261,25 @@ def run_all(
     mbti6, gender6, age6,
     mbti7, gender7, age7,
     mbti8, gender8, age8,
+    mbti9, gender9, age9,
+    mbti10, gender10, age10,
+    mbti11, gender11, age11,
+    mbti12, gender12, age12,
+    mbti13, gender13, age13,
+    mbti14, gender14, age14,
+    mbti15, gender15, age15,
     duration, custom_days_val, province, city, themes,
 ):
-    actual_count = compute_count(radio_count, extra_count_val)
+    actual_count = compute_count(count)
     all_data = [
         (mbti1, gender1, age1), (mbti2, gender2, age2),
         (mbti3, gender3, age3), (mbti4, gender4, age4),
         (mbti5, gender5, age5), (mbti6, gender6, age6),
         (mbti7, gender7, age7), (mbti8, gender8, age8),
+        (mbti9, gender9, age9), (mbti10, gender10, age10),
+        (mbti11, gender11, age11), (mbti12, gender12, age12),
+        (mbti13, gender13, age13), (mbti14, gender14, age14),
+        (mbti15, gender15, age15),
     ]
     # 3인 미만이면 MBTI 필수, 3인 이상이면 선택
     mbti_required = actual_count < 3
@@ -574,21 +577,11 @@ with gr.Blocks(title="AI 국내 여행 도우미", theme=gr.themes.Soft(), css=C
 
             # STEP 1
             gr.Markdown("### 👥 STEP 1. 여행 멤버")
-            with gr.Row():
-                count = gr.Radio(
-                    choices=[1, 2, 3, 4],
-                    value=1,
-                    label="인원 수 (버튼 선택)",
-                    scale=3,
-                )
-                extra_count = gr.Number(
-                    label="5인 이상 직접 입력",
-                    minimum=5,
-                    maximum=MAX_MEMBERS,
-                    precision=0,
-                    value=None,
-                    scale=2,
-                )
+            count = gr.Dropdown(
+                choices=list(range(1, MAX_MEMBERS + 1)),
+                value=1,
+                label="인원 수 선택 (최대 15명)",
+            )
 
             rows, mbtis, genders, ages = [], [], [], []
             for i in range(MAX_MEMBERS):
@@ -645,8 +638,7 @@ with gr.Blocks(title="AI 국내 여행 도우미", theme=gr.themes.Soft(), css=C
             )
 
     # ── 이벤트 ──────────────────────────────────────────────────────────────
-    count.change(fn=update_rows_radio, inputs=[count], outputs=rows + [extra_count])
-    extra_count.change(fn=update_rows_extra, inputs=[extra_count], outputs=rows)
+    count.change(fn=update_rows_count, inputs=[count], outputs=rows)
     province_input.change(fn=update_city_dropdown, inputs=[province_input], outputs=[city_input])
     duration.change(fn=toggle_custom_days, inputs=[duration], outputs=[custom_days])
     themes_input.change(fn=limit_themes, inputs=[themes_input], outputs=[themes_input])
@@ -657,7 +649,7 @@ with gr.Blocks(title="AI 국내 여행 도우미", theme=gr.themes.Soft(), css=C
 
     btn.click(
         fn=run_all,
-        inputs=[count, extra_count] + member_inputs + [duration, custom_days, province_input, city_input, themes_input],
+        inputs=[count] + member_inputs + [duration, custom_days, province_input, city_input, themes_input],
         outputs=[rec_output, sched_output, pdf_link_output, pdf_output],
     )
 
