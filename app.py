@@ -18,6 +18,8 @@ from openai import OpenAI
 matplotlib.use("Agg")
 load_dotenv()
 
+MAX_MEMBERS = 8
+
 # ── 상수 ────────────────────────────────────────────────────────────────────
 MBTI_LIST = [
     "ISTJ", "ISFJ", "INFJ", "INTJ",
@@ -26,7 +28,7 @@ MBTI_LIST = [
     "ESTJ", "ESFJ", "ENFJ", "ENTJ",
 ]
 REGION_TREE = {
-    "(선택 안 함)": [],
+    "(필수 선택)": [],
     "서울/경기/인천": ["서울", "인천", "수원", "성남", "고양", "부천", "안산", "안양", "용인", "광명", "평택", "시흥", "파주", "의정부", "김포", "하남", "광주", "양주", "구리", "남양주", "화성", "이천", "여주", "가평", "양평"],
     "강원": ["춘천", "강릉", "원주", "속초", "동해", "태백", "삼척", "홍천", "횡성", "평창", "정선", "철원", "화천", "양구", "인제", "고성", "양양"],
     "충청": ["대전", "청주", "충주", "천안", "아산", "공주", "보령", "서산", "논산", "계룡", "당진", "제천", "단양", "음성", "진천", "괴산", "증평", "세종"],
@@ -79,25 +81,47 @@ plt.rcParams["axes.unicode_minus"] = False
 
 
 # ── UI 헬퍼 ─────────────────────────────────────────────────────────────────
-def update_rows(count: int):
-    return [gr.update(visible=(i < int(count))) for i in range(4)]
+def compute_count(radio_val, extra_val):
+    if extra_val and int(extra_val) >= 5:
+        return int(extra_val)
+    return int(radio_val) if radio_val else 1
+
+
+def update_rows_radio(radio_val):
+    n = int(radio_val) if radio_val else 1
+    updates = [gr.update(visible=(i < n)) for i in range(MAX_MEMBERS)]
+    return updates + [gr.update(value=None)]  # extra_count 초기화
+
+
+def update_rows_extra(extra_val):
+    n = int(extra_val) if extra_val and extra_val >= 5 else 1
+    return [gr.update(visible=(i < n)) for i in range(MAX_MEMBERS)]
 
 
 def update_city_dropdown(province: str):
     cities = REGION_TREE.get(province, [])
     if not cities:
-        return gr.update(choices=[], value=None, visible=False)
-    return gr.update(choices=["(선택 안 함)"] + cities, value="(선택 안 함)", visible=True)
+        return gr.update(choices=["(선택 사항)"], value="(선택 사항)")
+    return gr.update(choices=["(선택 사항)"] + cities, value="(선택 사항)")
+
+
+def toggle_custom_days(duration: str):
+    return gr.update(visible=(duration == "4박5일 이상"))
+
+
+def limit_themes(themes):
+    if len(themes) > 2:
+        return gr.update(value=themes[:2])
+    return gr.update(value=themes)
 
 
 # ── 통합 프롬프트 ────────────────────────────────────────────────────────────
-def _build_prompt(members, duration, region, themes):
-    n_days = DURATION_DAYS.get(duration, 1)
+def _build_prompt(members, duration_label, n_days, region, themes):
     member_lines = "\n".join(
-        f"  - 멤버{i+1}: MBTI={m[0]} ({MBTI_TRAITS.get(m[0], '')}), 성별={m[1]}, 나이={int(m[2])}세"
+        f"  - 멤버{i+1}: MBTI={m[0] or '미입력'} ({MBTI_TRAITS.get(m[0], '정보 없음') if m[0] else ''}), 성별={m[1]}, 나이={int(m[2])}세"
         for i, m in enumerate(members)
     )
-    region_line = f"선호 지역: {region}" if region and region != "(선택 안 함)" else "지역 무관"
+    region_line = f"선호 지역: {region}" if region and region not in ("(필수 선택)", "(선택 사항)") else "지역 무관"
     themes_line = f"선호 테마: {', '.join(themes)}" if themes else "테마 무관"
     schedule_keys = ", ".join(f'"{i+1}일차": [...]' for i in range(n_days))
 
@@ -108,7 +132,7 @@ def _build_prompt(members, duration, region, themes):
 {member_lines}
 
 [여행 조건]
-- 여행 기간: {duration} (총 {n_days}일)
+- 여행 기간: {duration_label} (총 {n_days}일)
 - {region_line}
 - {themes_line}
 
@@ -236,31 +260,49 @@ def _make_pdf(data: dict) -> str | None:
 
 # ── 메인 함수 ────────────────────────────────────────────────────────────────
 def run_all(
-    count,
+    radio_count, extra_count_val,
     mbti1, gender1, age1,
     mbti2, gender2, age2,
     mbti3, gender3, age3,
     mbti4, gender4, age4,
-    duration, province, city, themes,
+    mbti5, gender5, age5,
+    mbti6, gender6, age6,
+    mbti7, gender7, age7,
+    mbti8, gender8, age8,
+    duration, custom_days_val, province, city, themes,
 ):
+    actual_count = compute_count(radio_count, extra_count_val)
     all_data = [
         (mbti1, gender1, age1), (mbti2, gender2, age2),
         (mbti3, gender3, age3), (mbti4, gender4, age4),
+        (mbti5, gender5, age5), (mbti6, gender6, age6),
+        (mbti7, gender7, age7), (mbti8, gender8, age8),
     ]
+    # 3인 미만이면 MBTI 필수, 3인 이상이면 선택
+    mbti_required = actual_count < 3
+
     active = []
-    for i in range(int(count)):
+    for i in range(actual_count):
         mbti, gender, age = all_data[i]
-        if not mbti:
+        if not mbti and mbti_required:
             return f"❌ 멤버{i+1}의 MBTI를 선택해주세요.", "", "", gr.update(visible=False, value=None)
         if not age or age <= 0:
             return f"❌ 멤버{i+1}의 나이를 입력해주세요.", "", "", gr.update(visible=False, value=None)
-        active.append((mbti, gender, age))
+        active.append((mbti or None, gender, age))
 
-    # 선택된 지역 결정: 시/군 선택 시 우선, 없으면 도/광역 사용
+    # 여행 기간 결정
+    if duration == "4박5일 이상" and custom_days_val and custom_days_val >= 5:
+        n_days = int(custom_days_val)
+        duration_label = f"{n_days-1}박{n_days}일"
+    else:
+        n_days = DURATION_DAYS.get(duration, 1)
+        duration_label = duration
+
+    # 선택된 지역 결정
     region = ""
-    if city and city != "(선택 안 함)":
+    if city and city not in ("(선택 사항)", None):
         region = city
-    elif province and province != "(선택 안 함)":
+    elif province and province not in ("(필수 선택)", None):
         region = province
 
     if not region and not themes:
@@ -272,7 +314,7 @@ def run_all(
 
     try:
         client = OpenAI(api_key=api_key)
-        prompt = _build_prompt(active, duration, region, themes)
+        prompt = _build_prompt(active, duration_label, n_days, region, themes)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
@@ -284,7 +326,6 @@ def run_all(
         m = re.search(r"\{.*\}", raw, re.DOTALL)
         data = json.loads(m.group() if m else raw)
 
-        # 추천 HTML (주소 + 네이버맵 링크 포함)
         recs   = data.get("recommendations", [])
         mbti_a = data.get("mbti_analysis", "")
         tips   = data.get("tips", [])
@@ -321,16 +362,13 @@ def run_all(
             rec_html += f"<li>{tip}</li>"
         rec_html += "</ol></div>"
 
-        # 일정표 HTML
         schedule   = data.get("schedule", {})
         sched_html = _schedule_html(schedule)
 
-        # PDF
         pdf_path = _make_pdf(data)
         top_dest = data.get("top_destination", "여행지")
 
         if pdf_path:
-            filename = os.path.basename(pdf_path)
             pdf_link_html = f'''<div class="pdf-download-link" style="margin-top:16px">
   <a href="/file={pdf_path}" download="{top_dest}_여행일정표.pdf">
     📥 {top_dest}_여행일정표.pdf — 클릭하여 다운로드
@@ -414,6 +452,82 @@ input, select, textarea, .input-wrap {
 .pdf-download-link a:hover {
     background: #DBEAFE;
 }
+
+/* ── 모든 라디오 버튼을 네모 체크박스 스타일로 ── */
+input[type="radio"] {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 17px !important;
+    height: 17px !important;
+    border: 2px solid #93C5FD !important;
+    border-radius: 3px !important;
+    background: white !important;
+    cursor: pointer !important;
+    position: relative !important;
+    flex-shrink: 0 !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
+    margin-top: 1px !important;
+    transition: background 0.15s, border-color 0.15s !important;
+}
+input[type="radio"]:checked {
+    background: #2563EB !important;
+    border-color: #1D4ED8 !important;
+}
+input[type="radio"]:checked::after {
+    content: "" !important;
+    display: block !important;
+    position: absolute !important;
+    left: 3px !important;
+    top: 0px !important;
+    width: 5px !important;
+    height: 9px !important;
+    border: 2.5px solid white !important;
+    border-top: none !important;
+    border-left: none !important;
+    transform: rotate(45deg) !important;
+}
+input[type="radio"]:hover {
+    border-color: #2563EB !important;
+}
+
+/* ── 체크박스도 동일한 네모 스타일 통일 ── */
+input[type="checkbox"] {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 17px !important;
+    height: 17px !important;
+    border: 2px solid #93C5FD !important;
+    border-radius: 3px !important;
+    background: white !important;
+    cursor: pointer !important;
+    position: relative !important;
+    flex-shrink: 0 !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
+    margin-top: 1px !important;
+    transition: background 0.15s, border-color 0.15s !important;
+}
+input[type="checkbox"]:checked {
+    background: #2563EB !important;
+    border-color: #1D4ED8 !important;
+}
+input[type="checkbox"]:checked::after {
+    content: "" !important;
+    display: block !important;
+    position: absolute !important;
+    left: 3px !important;
+    top: 0px !important;
+    width: 5px !important;
+    height: 9px !important;
+    border: 2.5px solid white !important;
+    border-top: none !important;
+    border-left: none !important;
+    transform: rotate(45deg) !important;
+}
+input[type="checkbox"]:hover {
+    border-color: #2563EB !important;
+}
 """
 
 with gr.Blocks(title="AI 국내 여행 도우미", theme=gr.themes.Soft(), css=CSS) as demo:
@@ -425,11 +539,27 @@ with gr.Blocks(title="AI 국내 여행 도우미", theme=gr.themes.Soft(), css=C
 
             # STEP 1
             gr.Markdown("### 👥 STEP 1. 여행 멤버")
-            count = gr.Radio(choices=[1, 2, 3, 4], value=1, label="인원 수")
+            with gr.Row():
+                count = gr.Radio(
+                    choices=[1, 2, 3, 4],
+                    value=1,
+                    label="인원 수 (버튼 선택)",
+                    scale=3,
+                )
+                extra_count = gr.Number(
+                    label="5인 이상 직접 입력",
+                    minimum=5,
+                    maximum=MAX_MEMBERS,
+                    precision=0,
+                    value=None,
+                    scale=2,
+                )
+
             rows, mbtis, genders, ages = [], [], [], []
-            for i in range(4):
+            for i in range(MAX_MEMBERS):
                 with gr.Row(visible=(i == 0)) as row:
-                    mbti   = gr.Dropdown(choices=MBTI_LIST, label=f"멤버{i+1} MBTI", scale=2)
+                    mbti_label = f"멤버{i+1} MBTI" if i < 2 else f"멤버{i+1} MBTI (선택)"
+                    mbti   = gr.Dropdown(choices=MBTI_LIST, label=mbti_label, scale=2)
                     gender = gr.Radio(choices=["남", "여", "미선택"], value="미선택",
                                       label="성별", scale=1)
                     age    = gr.Number(label="나이", precision=0, scale=1)
@@ -441,21 +571,29 @@ with gr.Blocks(title="AI 국내 여행 도우미", theme=gr.themes.Soft(), css=C
             # STEP 2
             gr.Markdown("### 📅 STEP 2. 여행 기간")
             duration = gr.Radio(choices=DURATIONS, value="1박2일", label="여행 기간")
+            custom_days = gr.Number(
+                label="여행 일수 입력 (5일 이상)",
+                minimum=5,
+                maximum=30,
+                precision=0,
+                value=5,
+                visible=False,
+            )
 
             # STEP 3
             gr.Markdown("### 📍 STEP 3. 지역 또는 테마 *(하나 이상 필수)*")
             province_input = gr.Dropdown(
                 choices=REGION_PROVINCES,
-                value="(선택 안 함)",
+                value="(필수 선택)",
                 label="① 도/광역시 선택",
             )
             city_input = gr.Dropdown(
-                choices=[],
-                value=None,
+                choices=["(선택 사항)"],
+                value="(선택 사항)",
                 label="② 시/군 선택 (선택 사항)",
-                visible=False,
+                visible=True,
             )
-            themes_input = gr.CheckboxGroup(choices=THEMES, label="테마 선택")
+            themes_input = gr.CheckboxGroup(choices=THEMES, label="테마 선택 (최대 2개)")
 
             btn = gr.Button("✈️  추천 + 일정 생성하기", variant="primary", size="lg")
 
@@ -472,16 +610,19 @@ with gr.Blocks(title="AI 국내 여행 도우미", theme=gr.themes.Soft(), css=C
             )
 
     # ── 이벤트 ──────────────────────────────────────────────────────────────
-    count.change(fn=update_rows, inputs=[count], outputs=rows)
+    count.change(fn=update_rows_radio, inputs=[count], outputs=rows + [extra_count])
+    extra_count.change(fn=update_rows_extra, inputs=[extra_count], outputs=rows)
     province_input.change(fn=update_city_dropdown, inputs=[province_input], outputs=[city_input])
+    duration.change(fn=toggle_custom_days, inputs=[duration], outputs=[custom_days])
+    themes_input.change(fn=limit_themes, inputs=[themes_input], outputs=[themes_input])
 
     member_inputs = []
-    for i in range(4):
+    for i in range(MAX_MEMBERS):
         member_inputs.extend([mbtis[i], genders[i], ages[i]])
 
     btn.click(
         fn=run_all,
-        inputs=[count] + member_inputs + [duration, province_input, city_input, themes_input],
+        inputs=[count, extra_count] + member_inputs + [duration, custom_days, province_input, city_input, themes_input],
         outputs=[rec_output, sched_output, pdf_link_output, pdf_output],
     )
 
