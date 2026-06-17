@@ -71,7 +71,18 @@ _NAVER_FOOD_QUERIES = {
 }
 
 
-def _naver_local_search(query: str, client_id: str, client_secret: str, display: int = 5) -> list:
+def _to_naver_place_url(raw_link: str, name: str) -> str:
+    """네이버 API link에서 place ID를 추출해 정식 플레이스 URL 반환."""
+    if raw_link:
+        m = re.search(r"/place/(\d+)", raw_link)
+        if m:
+            return f"https://map.naver.com/p/entry/place/{m.group(1)}"
+    # fallback: 이름으로만 검색 (주소 제외)
+    return f"https://map.naver.com/p/search/{urllib.parse.quote(name)}"
+
+
+def _naver_local_search(query: str, client_id: str, client_secret: str, display: int = 10) -> list:
+    """네이버 로컬 검색 API - sort=comment(리뷰순, 상위 노출 기준)."""
     url = (
         "https://openapi.naver.com/v1/search/local.json"
         f"?query={urllib.parse.quote(query)}&display={display}&sort=comment"
@@ -81,7 +92,7 @@ def _naver_local_search(query: str, client_id: str, client_secret: str, display:
         "X-Naver-Client-Secret": client_secret,
     })
     try:
-        with urllib.request.urlopen(req, timeout=4) as resp:
+        with urllib.request.urlopen(req, timeout=5) as resp:
             return json.loads(resp.read()).get("items", [])
     except Exception:
         return []
@@ -90,25 +101,28 @@ def _naver_local_search(query: str, client_id: str, client_secret: str, display:
 def _search_naver_restaurants(region: str, client_id: str, client_secret: str) -> dict:
     import concurrent.futures
 
+    # 전역 중복 제거 (카테고리 간 동일 장소 방지)
+    global_seen: set = set()
+
     def fetch_cat(cat_queries):
         cat, query_tmpls = cat_queries
-        seen_local: set = set()
         items = []
         for tmpl in query_tmpls:
             q = tmpl.format(r=region)
-            for raw in _naver_local_search(q, client_id, client_secret, display=5):
+            for raw in _naver_local_search(q, client_id, client_secret, display=10):
                 name = re.sub(r"<[^>]+>", "", raw.get("title", "")).strip()
                 addr = raw.get("roadAddress", "") or raw.get("address", "")
                 key  = name + addr
-                if key in seen_local or not name:
+                if not name or key in global_seen:
                     continue
-                seen_local.add(key)
+                global_seen.add(key)
+                place_url = _to_naver_place_url(raw.get("link", ""), name)
                 items.append({
-                    "name":    name,
-                    "address": addr,
-                    "desc":    raw.get("category", ""),
-                    "price":   "",
-                    "link":    raw.get("link", ""),
+                    "name":      name,
+                    "address":   addr,
+                    "desc":      raw.get("category", ""),
+                    "price":     "",
+                    "place_url": place_url,
                 })
             if len(items) >= 10:
                 break
@@ -118,7 +132,7 @@ def _search_naver_restaurants(region: str, client_id: str, client_secret: str) -
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         futures = {executor.submit(fetch_cat, (cat, tmpls)): cat
                    for cat, tmpls in _NAVER_FOOD_QUERIES.items()}
-        for future in concurrent.futures.as_completed(futures, timeout=20):
+        for future in concurrent.futures.as_completed(futures, timeout=25):
             try:
                 cat, items = future.result()
                 result[cat] = items
@@ -599,20 +613,19 @@ def run_all(
                     rec_html += f'<h3 style="color:#1E40AF;margin:14px 0 8px">{icon} {cat}</h3>'
 
                     def _item_card(item):
-                        name  = item.get("name", "")
-                        addr  = item.get("address", "")
-                        desc  = item.get("desc", "")
-                        price = item.get("price", "")
-                        # 네이버 API link 우선, 없으면 이름으로만 검색 (addr 제외)
-                        raw_link  = item.get("link", "")
-                        place_url = raw_link if raw_link else f"https://map.naver.com/p/search/{urllib.parse.quote(name)}"
+                        name      = item.get("name", "")
+                        addr      = item.get("address", "")
+                        desc      = item.get("desc", "")
+                        price     = item.get("price", "")
+                        place_url = item.get("place_url") or f"https://map.naver.com/p/search/{urllib.parse.quote(name)}"
                         return f"""<div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px">
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
     <span style="font-weight:bold;font-size:13.5px;color:#1E293B">{name}</span>
     <a href="{place_url}" target="_blank"
-       style="display:inline-block;background:#03C75A;color:white;font-size:11px;font-weight:bold;
-              padding:3px 8px;border-radius:4px;text-decoration:none;white-space:nowrap;flex-shrink:0">
-      N 네이버 플레이스에서 보기
+       style="display:inline-flex;align-items:center;gap:4px;background:#03C75A;color:white;
+              font-size:11px;font-weight:bold;padding:3px 8px;border-radius:4px;
+              text-decoration:none;white-space:nowrap;flex-shrink:0">
+      <span style="font-weight:900;font-size:13px">N</span> 네이버 플레이스
     </a>
   </div>
   <div style="font-size:12px;color:#6B7280;margin-bottom:3px">📍 {addr}</div>
