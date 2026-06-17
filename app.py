@@ -116,6 +116,37 @@ def _build_prompt(members, duration_label, n_days, region, themes):
     region_line = f"선호 지역: {region}" if region and region not in ("(필수 선택)", "(선택 사항)") else "지역 무관"
     themes_line = f"선호 테마: {', '.join(themes)}" if themes else "테마 무관"
     schedule_keys = ", ".join(f'"{i+1}일차": [...]' for i in range(n_days))
+    is_food = "맛집 탐방" in themes
+    has_stay = n_days > 1
+
+    food_schema = ""
+    if is_food:
+        food_schema = """,
+  "restaurants": {
+    "아침": [{"name": "식당명", "address": "주소", "desc": "한 줄 설명", "price": "1인 가격대"}, ...10개],
+    "점심": [...10개],
+    "저녁": [...10개],
+    "카페": [...10개],
+    "분위기맛집": [...10개]
+  }"""
+
+    food_rule = ""
+    if is_food:
+        food_rule = """
+- restaurants: 아침/점심/저녁/카페/분위기맛집 각 10개, 전체 50개 중복 없이. 실제 존재하는 가게 이름, 주소, 간단한 설명, 1인 가격대 포함."""
+
+    stay_rule = ""
+    if has_stay:
+        stay_rule = """
+- accommodation: 추천 숙소 3곳의 name(숙소명), area(위치 동네), type(펜션/호텔/게스트하우스 등), price_per_night(1박 가격대) 포함."""
+        stay_schema = """,
+  "accommodation": [
+    {"name": "숙소명", "area": "위치", "type": "숙소유형", "price_per_night": "가격대"},
+    {"name": "숙소명", "area": "위치", "type": "숙소유형", "price_per_night": "가격대"},
+    {"name": "숙소명", "area": "위치", "type": "숙소유형", "price_per_night": "가격대"}
+  ]"""
+    else:
+        stay_schema = ""
 
     return f"""당신은 국내 여행 전문가이자 MBTI 전문가입니다.
 아래 정보를 바탕으로 여행지 추천과 상세 일정을 하나의 JSON으로 작성해주세요.
@@ -131,23 +162,25 @@ def _build_prompt(members, duration_label, n_days, region, themes):
 반드시 순수 JSON만 출력하세요 (마크다운 코드블록 없이):
 {{
   "top_destination": "1위 여행지명",
+  "trip_concept": "이번 여행의 컨셉 한 줄 (예: 부산 핫플 찍먹 투어, 제주 동쪽 완전 정복 등)",
   "recommendations": [
-    {{"rank": 1, "name": "여행지명", "address": "도로명주소 또는 지번주소 (시/군/구/동 포함)", "reason": "MBTI와 연결한 선정 이유 2~3문장"}},
-    {{"rank": 2, "name": "여행지명", "address": "도로명주소 또는 지번주소 (시/군/구/동 포함)", "reason": "선정 이유 2~3문장"}},
-    {{"rank": 3, "name": "여행지명", "address": "도로명주소 또는 지번주소 (시/군/구/동 포함)", "reason": "선정 이유 2~3문장"}}
+    {{"rank": 1, "name": "여행지명", "address": "도로명주소 (시/군/구/동 포함)", "reason": "MBTI와 연결한 선정 이유 2~3문장"}},
+    {{"rank": 2, "name": "여행지명", "address": "도로명주소", "reason": "선정 이유 2~3문장"}},
+    {{"rank": 3, "name": "여행지명", "address": "도로명주소", "reason": "선정 이유 2~3문장"}}
   ],
   "mbti_analysis": "MBTI 조합 여행 스타일을 재미있게 3~4문장",
   "tips": ["팁1", "팁2", "팁3"],
-  "schedule": {{{schedule_keys}}}
+  "schedule": {{{schedule_keys}}}{food_schema}{stay_schema}
 }}
 
 일정 항목 형식:
 {{"시간": "HH:MM", "장소": "장소명", "활동": "활동명", "상세내용": "설명 1~2문장", "이동수단": "교통수단"}}
 
 일정 작성 규칙:
-- 1시간 단위로 오전부터 마지막 날 저녁 숙박까지 빠짐없이 작성
-- 식사(아침/점심/저녁), 이동, 관광, 숙박 모두 포함
-- 날짜별로 {schedule_keys.split(':')[0].replace('"','').strip()} 형식 키에 배열 작성
+- 오전부터 마지막 날 저녁까지 빠짐없이 작성. 식사/이동/관광/숙박 모두 포함.
+- 【동선 핵심】지리적으로 한 방향으로 흘러가는 일정을 짜라. A→B→C→D처럼 이동하되 같은 곳을 왕복하지 마라.
+- 하루에 여러 도시를 억지로 넣지 말고, 한 지역을 깊게 파거나 인접 지역을 자연스럽게 연결하라.
+- 예를 들어 서울/경기/인천이면: "홍대-연남동-마포 감성 투어" 처럼 하나의 컨셉으로 동선을 묶어라.{food_rule}{stay_rule}
 """
 
 
@@ -330,7 +363,7 @@ def run_all(
                 )},
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=4096,
+            max_tokens=8192,
         )
         raw = response.choices[0].message.content.strip()
         raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
@@ -338,12 +371,21 @@ def run_all(
         m = re.search(r"\{.*\}", raw, re.DOTALL)
         data = json.loads(m.group() if m else raw)
 
-        recs   = data.get("recommendations", [])
-        mbti_a = data.get("mbti_analysis", "")
-        tips   = data.get("tips", [])
-        medals = ["🥇", "🥈", "🥉"]
+        top_dest  = data.get("top_destination", "여행지")
+        recs      = data.get("recommendations", [])
+        mbti_a    = data.get("mbti_analysis", "")
+        tips      = data.get("tips", [])
+        concept   = data.get("trip_concept", "")
+        medals    = ["🥇", "🥈", "🥉"]
+        is_food   = "맛집 탐방" in themes
+        has_stay  = n_days > 1
 
         rec_html = '<div style="font-family:\'Apple SD Gothic Neo\',\'Nanum Gothic\',sans-serif">'
+
+        # 여행 컨셉
+        if concept:
+            rec_html += f'<div style="background:#EFF6FF;border:2px solid #3B82F6;border-radius:10px;padding:10px 16px;margin-bottom:16px;font-size:15px;font-weight:bold;color:#1D4ED8">🎯 {concept}</div>'
+
         rec_html += '<h2 style="color:#1D4ED8">🏆 추천 여행지 TOP 3</h2>'
         for i, r in enumerate(recs):
             addr = r.get("address", "")
@@ -372,13 +414,86 @@ def run_all(
 <ol style="font-size:13.5px;line-height:1.9;color:#374151">"""
         for tip in tips:
             rec_html += f"<li>{tip}</li>"
-        rec_html += "</ol></div>"
+        rec_html += "</ol>"
+
+        # ── 숙박 추천 + 예약 링크 ──────────────────────────────────────────
+        if has_stay:
+            top_dest_q = urllib.parse.quote(top_dest)
+            yeogi_url  = f"https://www.yeogieottae.com/search?keyword={top_dest_q}&adult={actual_count}"
+            agoda_url  = f"https://www.agoda.com/ko-kr/search?city={top_dest_q}&rooms=1&adults={actual_count}"
+            rec_html += f"""
+<hr style="border:none;border-top:1px solid #E5E7EB;margin:16px 0">
+<h2 style="color:#1D4ED8">🏨 숙소 예약</h2>
+<p style="font-size:13px;color:#6B7280;margin-bottom:10px">
+  {actual_count}명 기준으로 검색합니다. 아래 버튼을 클릭하면 바로 연결됩니다.
+</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+  <a href="{yeogi_url}" target="_blank"
+     style="background:#FF5A5F;color:white;padding:10px 18px;border-radius:8px;
+            text-decoration:none;font-weight:bold;font-size:14px">
+    🏠 여기어때에서 찾기
+  </a>
+  <a href="{agoda_url}" target="_blank"
+     style="background:#5C2D8C;color:white;padding:10px 18px;border-radius:8px;
+            text-decoration:none;font-weight:bold;font-size:14px">
+    🌐 아고다에서 찾기
+  </a>
+</div>"""
+            # AI 추천 숙소 목록
+            accommodations = data.get("accommodation", [])
+            if accommodations:
+                rec_html += '<div style="display:flex;flex-direction:column;gap:8px">'
+                for acc in accommodations:
+                    acc_q = urllib.parse.quote(f"{acc.get('name','')} {acc.get('area','')}")
+                    yeogi_acc = f"https://www.yeogieottae.com/search?keyword={acc_q}&adult={actual_count}"
+                    rec_html += f"""
+<div style="background:#FFF5F5;border-left:4px solid #FF5A5F;padding:10px 14px;border-radius:0 8px 8px 0">
+  <div style="font-weight:bold;font-size:14px;margin-bottom:2px">
+    🏨 {acc.get('name','')} <span style="color:#6B7280;font-weight:normal;font-size:12px">({acc.get('area','')} · {acc.get('type','')})</span>
+  </div>
+  <div style="font-size:13px;color:#374151;margin-bottom:6px">1박 {acc.get('price_per_night','')}</div>
+  <a href="{yeogi_acc}" target="_blank"
+     style="font-size:12px;color:#FF5A5F;text-decoration:none">여기어때에서 검색 →</a>
+</div>"""
+                rec_html += '</div>'
+
+        # ── 맛집 리스트 ────────────────────────────────────────────────────
+        if is_food:
+            restaurants = data.get("restaurants", {})
+            cat_icons = {"아침": "🌅", "점심": "☀️", "저녁": "🌙", "카페": "☕", "분위기맛집": "✨"}
+            if restaurants:
+                rec_html += """
+<hr style="border:none;border-top:1px solid #E5E7EB;margin:16px 0">
+<h2 style="color:#1D4ED8">🍽️ 맛집 리스트</h2>"""
+                for cat, icon in cat_icons.items():
+                    items = restaurants.get(cat, [])
+                    if not items:
+                        continue
+                    rec_html += f'<h3 style="color:#1E40AF;margin:14px 0 8px">{icon} {cat}</h3>'
+                    rec_html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px">'
+                    for item in items:
+                        name    = item.get("name", "")
+                        addr    = item.get("address", "")
+                        desc    = item.get("desc", "")
+                        price   = item.get("price", "")
+                        map_url = f"https://map.naver.com/p/search/{urllib.parse.quote(name+' '+addr)}" if name else ""
+                        rec_html += f"""
+<div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px">
+  <div style="font-weight:bold;font-size:13.5px;margin-bottom:2px">
+    <a href="{map_url}" target="_blank" style="color:#92400E;text-decoration:none">{name} 📍</a>
+  </div>
+  <div style="font-size:12px;color:#6B7280;margin-bottom:4px">{addr}</div>
+  <div style="font-size:12.5px;color:#374151;margin-bottom:4px">{desc}</div>
+  <div style="font-size:12px;font-weight:bold;color:#B45309">{price}</div>
+</div>"""
+                    rec_html += '</div>'
+
+        rec_html += "</div>"
 
         schedule   = data.get("schedule", {})
         sched_html = _schedule_html(schedule)
 
         pdf_path = _make_pdf(data)
-        top_dest = data.get("top_destination", "여행지")
 
         if pdf_path:
             pdf_link_html = f'''<div class="pdf-download-link" style="margin-top:16px">
