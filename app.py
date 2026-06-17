@@ -126,6 +126,64 @@ def _search_naver_attractions(region: str, client_id: str, client_secret: str) -
     return places[:15]
 
 
+def _search_yeogi_gemini(
+    region: str, checkin: str, checkout: str, guests: int
+) -> list[dict]:
+    """Gemini Search Grounding으로 여기어때 숙소 실제 리스팅 검색.
+    실패 시 빈 리스트 반환 → 호출측에서 fallback 처리.
+    """
+    try:
+        import google.generativeai as genai
+
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        if not api_key:
+            return []
+
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(
+            model_name="gemini-2.0-flash",
+            tools=[{"google_search_retrieval": {}}],
+        )
+
+        prompt = (
+            f"여기어때(yeogi.com)에서 {region} 숙소를 검색해줘. "
+            f"체크인 {checkin}, 체크아웃 {checkout}, {guests}명 기준. "
+            "실제로 여기어때에 등록된 숙소 6곳 이상을 찾아서 "
+            "JSON 배열로만 답해줘. 각 항목은 반드시 아래 키를 포함해야 해:\n"
+            '{"name": "숙소명", "type": "호텔|펜션|게스트하우스|홈&빌라 중 하나", '
+            '"price": "1박 가격 (예: 8만원~)", "url": "여기어때 해당 숙소 URL 또는 검색 URL"}\n'
+            "마크다운 코드블록 없이 순수 JSON 배열만 출력."
+        )
+
+        resp = model.generate_content(prompt)
+        text = resp.text.strip()
+
+        # JSON 파싱
+        m = re.search(r"\[.*\]", text, re.S)
+        if not m:
+            return []
+        items = json.loads(m.group(0))
+        if not isinstance(items, list):
+            return []
+
+        # 기본 검증
+        valid = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            if not item.get("name"):
+                continue
+            # URL이 여기어때 도메인인지 확인
+            url = item.get("url", "")
+            if "yeogi.com" not in url:
+                item["url"] = ""
+            valid.append(item)
+        return valid[:6]
+
+    except Exception:
+        return []
+
+
 def _search_naver_restaurants(region: str, client_id: str, client_secret: str) -> dict:
     import concurrent.futures
 
@@ -657,71 +715,94 @@ def run_all(
             checkout_date = checkin_date + timedelta(days=n_nights)
             checkin_str  = checkin_date.strftime("%Y-%m-%d")
             checkout_str = checkout_date.strftime("%Y-%m-%d")
-
-            def _yeogi_url(keyword, ci=checkin_str, co=checkout_str):
-                kw = urllib.parse.quote(keyword)
-                return (f"https://www.yeogi.com/domestic-accommodations"
-                        f"?keyword={kw}&checkIn={ci}&checkOut={co}"
-                        f"&personal={actual_count}&typoCorrect=true&nonAffiliated=true")
-
-            # 유형별 여기어때 직접 링크 3종 카드
-            ACC_TYPES = [
-                {
-                    "type": "호텔 리조트",
-                    "emoji": "🏨",
-                    "desc": "수영장·부대시설 완비, 프리미엄 숙박",
-                    "price": "평균 15~35만원 / 1박",
-                    "category": "2",
-                    "color": "#1D4ED8",
-                    "bg": "#EFF6FF",
-                    "border": "#93C5FD",
-                },
-                {
-                    "type": "펜션",
-                    "emoji": "🏡",
-                    "desc": "독채·바베큐, 가족·커플 여행 최적",
-                    "price": "평균 10~25만원 / 1박",
-                    "category": "3",
-                    "color": "#047857",
-                    "bg": "#ECFDF5",
-                    "border": "#6EE7B7",
-                },
-                {
-                    "type": "게스트하우스",
-                    "emoji": "🏠",
-                    "desc": "합리적 가격, 여행자 네트워킹 최적",
-                    "price": "평균 2~6만원 / 1박",
-                    "category": "18",
-                    "color": "#92400E",
-                    "bg": "#FFFBEB",
-                    "border": "#FCD34D",
-                },
-                {
-                    "type": "홈&빌라",
-                    "emoji": "🏘️",
-                    "desc": "독립 공간, 단체·가족 여행 인기",
-                    "price": "평균 15~40만원 / 1박",
-                    "category": "15",
-                    "color": "#6D28D9",
-                    "bg": "#F5F3FF",
-                    "border": "#C4B5FD",
-                },
-            ]
             search_area = region or top_dest
+
             rec_html += f"""
 <hr style="border:none;border-top:1px solid #E5E7EB;margin:16px 0">
-<h2 style="color:#1D4ED8">🏨 숙소 예약</h2>
+<h2 style="color:#1D4ED8">🏨 숙소 추천</h2>
 <p style="font-size:13px;color:#6B7280;margin-bottom:12px">
   {actual_count}명 · {checkin_str} → {checkout_str} ({n_nights}박) · <b>{search_area}</b> 기준
-</p>
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">"""
-            for acc in ACC_TYPES:
-                kw = urllib.parse.quote(search_area)
-                url = (f"https://www.yeogi.com/domestic-accommodations"
-                       f"?sortType=RECOMMEND&keyword={kw}"
-                       f"&personal={actual_count}&checkIn={checkin_str}&checkOut={checkout_str}"
-                       f"&typoCorrect=true&nonAffiliated=true&category={acc['category']}")
-                rec_html += f"""
+</p>"""
+
+            # Gemini Search Grounding으로 실제 여기어때 숙소 검색
+            gemini_listings = _search_yeogi_gemini(
+                search_area, checkin_str, checkout_str, actual_count
+            )
+
+            TYPE_EMOJI = {
+                "호텔": "🏨", "리조트": "🏨", "호텔 리조트": "🏨",
+                "펜션": "🏡", "게스트하우스": "🏠", "홈&빌라": "🏘️",
+                "모텔": "🛏️",
+            }
+            TYPE_COLOR = {
+                "호텔": "#1D4ED8", "리조트": "#1D4ED8", "호텔 리조트": "#1D4ED8",
+                "펜션": "#047857", "게스트하우스": "#92400E",
+                "홈&빌라": "#6D28D9", "모텔": "#374151",
+            }
+
+            if gemini_listings:
+                # 실제 숙소 카드
+                rec_html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">'
+                for item in gemini_listings:
+                    name   = item.get("name", "")
+                    atype  = item.get("type", "")
+                    price  = item.get("price", "")
+                    url    = item.get("url", "")
+                    emoji  = TYPE_EMOJI.get(atype, "🏨")
+                    color  = TYPE_COLOR.get(atype, "#1D4ED8")
+
+                    if not url:
+                        kw  = urllib.parse.quote(f"{search_area} {name}")
+                        url = (f"https://www.yeogi.com/domestic-accommodations"
+                               f"?sortType=RECOMMEND&keyword={kw}"
+                               f"&personal={actual_count}&checkIn={checkin_str}&checkOut={checkout_str}"
+                               f"&typoCorrect=true&nonAffiliated=true")
+
+                    rec_html += f"""
+<div style="background:#F8FAFC;border:1px solid #CBD5E1;
+            border-radius:10px;padding:14px 16px">
+  <div style="font-size:24px;margin-bottom:6px">{emoji}</div>
+  <div style="font-weight:bold;font-size:14px;color:#1E293B;margin-bottom:2px">{name}</div>
+  <div style="font-size:12px;color:{color};font-weight:bold;margin-bottom:4px">{atype}</div>
+  <div style="font-size:12px;color:#6B7280;margin-bottom:10px">{price}</div>
+  <a href="{url}" target="_blank"
+     style="display:block;text-align:center;background:{color};color:white;
+            font-size:12px;font-weight:bold;padding:7px 10px;border-radius:6px;
+            text-decoration:none">
+    여기어때에서 보기 →
+  </a>
+</div>"""
+                rec_html += "\n</div>"
+                rec_html += '<p style="font-size:11px;color:#9CA3AF;margin-top:8px">* Gemini AI 웹검색 기반 — 실제 가격·가용성은 여기어때에서 확인하세요.</p>'
+
+            else:
+                # Fallback: 유형별 카드
+                ACC_TYPES = [
+                    {"type": "호텔 리조트", "emoji": "🏨",
+                     "desc": "수영장·부대시설 완비, 프리미엄 숙박",
+                     "price": "평균 15~35만원 / 1박", "category": "2",
+                     "color": "#1D4ED8", "bg": "#EFF6FF", "border": "#93C5FD"},
+                    {"type": "펜션", "emoji": "🏡",
+                     "desc": "독채·바베큐, 가족·커플 여행 최적",
+                     "price": "평균 10~25만원 / 1박", "category": "3",
+                     "color": "#047857", "bg": "#ECFDF5", "border": "#6EE7B7"},
+                    {"type": "게스트하우스", "emoji": "🏠",
+                     "desc": "합리적 가격, 여행자 네트워킹 최적",
+                     "price": "평균 2~6만원 / 1박", "category": "18",
+                     "color": "#92400E", "bg": "#FFFBEB", "border": "#FCD34D"},
+                    {"type": "홈&빌라", "emoji": "🏘️",
+                     "desc": "독립 공간, 단체·가족 여행 인기",
+                     "price": "평균 15~40만원 / 1박", "category": "15",
+                     "color": "#6D28D9", "bg": "#F5F3FF", "border": "#C4B5FD"},
+                ]
+                rec_html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">'
+                for acc in ACC_TYPES:
+                    kw  = urllib.parse.quote(search_area)
+                    url = (f"https://www.yeogi.com/domestic-accommodations"
+                           f"?sortType=RECOMMEND&keyword={kw}"
+                           f"&personal={actual_count}&checkIn={checkin_str}&checkOut={checkout_str}"
+                           f"&typoCorrect=true&nonAffiliated=true&category={acc['category']}")
+                    rec_html += f"""
 <div style="background:{acc['bg']};border:1px solid {acc['border']};
             border-radius:10px;padding:14px 16px">
   <div style="font-size:26px;margin-bottom:6px">{acc['emoji']}</div>
@@ -735,7 +816,7 @@ def run_all(
     여기어때에서 보기 →
   </a>
 </div>"""
-            rec_html += "\n</div>"
+                rec_html += "\n</div>"
 
         # ── 맛집 리스트 (네이버 로컬 API 결과 항상 표시) ──────────────────
         if True:
