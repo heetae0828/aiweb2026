@@ -63,26 +63,24 @@ DURATION_DAYS = {"당일치기": 1, "1박2일": 2, "2박3일": 3, "3박4일": 4,
 
 # ── 네이버 로컬 검색 ────────────────────────────────────────────────────────
 _NAVER_FOOD_QUERIES = {
-    "아침":     ["{r} 아침식사 맛집", "{r} 조식 맛집"],
-    "점심":     ["{r} 점심 맛집", "{r} 한식 맛집"],
-    "저녁":     ["{r} 저녁 맛집", "{r} 고기 맛집"],
-    "카페":     ["{r} 카페", "{r} 디저트 카페"],
-    "분위기맛집": ["{r} 분위기 좋은 식당", "{r} 뷰 맛집"],
+    "아침":     ["{r} 아침식사 맛집", "{r} 조식", "{r} 해장국"],
+    "점심":     ["{r} 점심 맛집", "{r} 맛집", "{r} 한식"],
+    "저녁":     ["{r} 저녁 맛집", "{r} 고기집", "{r} 해산물"],
+    "카페":     ["{r} 카페", "{r} 분위기 카페", "{r} 디저트"],
+    "분위기맛집": ["{r} 분위기 맛집", "{r} 뷰 맛집", "{r} 이색 레스토랑"],
 }
 
 
-def _to_naver_place_url(raw_link: str, name: str) -> str:
-    """네이버 API link에서 place ID를 추출해 정식 플레이스 URL 반환."""
-    if raw_link:
-        m = re.search(r"/place/(\d+)", raw_link)
-        if m:
-            return f"https://map.naver.com/p/entry/place/{m.group(1)}"
-    # fallback: 이름으로만 검색 (주소 제외)
-    return f"https://map.naver.com/p/search/{urllib.parse.quote(name)}"
+def _extract_place_id(raw_link: str) -> str | None:
+    """네이버 API link 필드에서 place ID 추출. 없으면 None."""
+    if not raw_link:
+        return None
+    m = re.search(r"/place/(\d+)", raw_link)
+    return m.group(1) if m else None
 
 
-def _naver_local_search(query: str, client_id: str, client_secret: str, display: int = 10) -> list:
-    """네이버 로컬 검색 API - sort=comment(리뷰순, 상위 노출 기준)."""
+def _naver_local_search(query: str, client_id: str, client_secret: str, display: int = 5) -> list:
+    """네이버 로컬 검색 API - sort=comment(리뷰순=상위 노출 기준)."""
     url = (
         "https://openapi.naver.com/v1/search/local.json"
         f"?query={urllib.parse.quote(query)}&display={display}&sort=comment"
@@ -101,22 +99,30 @@ def _naver_local_search(query: str, client_id: str, client_secret: str, display:
 def _search_naver_restaurants(region: str, client_id: str, client_secret: str) -> dict:
     import concurrent.futures
 
-    # 전역 중복 제거 (카테고리 간 동일 장소 방지)
-    global_seen: set = set()
+    global_seen: set = set()  # 카테고리 간 전역 중복 제거
 
-    def fetch_cat(cat_queries):
-        cat, query_tmpls = cat_queries
+    def fetch_cat(args):
+        cat, query_tmpls = args
         items = []
         for tmpl in query_tmpls:
+            if len(items) >= 10:
+                break
             q = tmpl.format(r=region)
-            for raw in _naver_local_search(q, client_id, client_secret, display=10):
-                name = re.sub(r"<[^>]+>", "", raw.get("title", "")).strip()
-                addr = raw.get("roadAddress", "") or raw.get("address", "")
-                key  = name + addr
-                if not name or key in global_seen:
+            for raw in _naver_local_search(q, client_id, client_secret, display=5):
+                name     = re.sub(r"<[^>]+>", "", raw.get("title", "")).strip()
+                addr     = raw.get("roadAddress", "") or raw.get("address", "")
+                raw_link = raw.get("link", "")
+                place_id = _extract_place_id(raw_link)
+
+                # place ID 없는 항목은 제외 (검색 URL 방지)
+                if not name or not place_id:
+                    continue
+                key = name + addr
+                if key in global_seen:
                     continue
                 global_seen.add(key)
-                place_url = _to_naver_place_url(raw.get("link", ""), name)
+
+                place_url = f"https://map.naver.com/p/entry/place/{place_id}"
                 items.append({
                     "name":      name,
                     "address":   addr,
@@ -124,8 +130,6 @@ def _search_naver_restaurants(region: str, client_id: str, client_secret: str) -
                     "price":     "",
                     "place_url": place_url,
                 })
-            if len(items) >= 10:
-                break
         return cat, items[:10]
 
     result = {}
@@ -218,39 +222,69 @@ def _build_prompt(members, duration_label, n_days, region, themes):
     else:
         stay_schema = ""
 
-    return f"""당신은 국내 여행 전문가이자 MBTI 전문가입니다.
-아래 정보를 바탕으로 여행지 추천과 상세 일정을 하나의 JSON으로 작성해주세요.
+    mbti_summary = ", ".join(m[0] for m in members if m[0]) or "미입력"
+    gender_age   = " / ".join(f"{m[1]} {int(m[2])}세" for m in members)
+    region_str   = region if region and region not in ("(필수 선택)", "(선택 사항)") else "미지정"
+    themes_str   = ", ".join(themes) if themes else "없음"
 
-[여행 멤버]
+    schedule_schema = "\n".join(
+        f'    "{i+1}일차": [\n'
+        f'      {{"시간":"09:00","장소":"장소명","활동":"활동명","상세내용":"구체적인 설명 2문장","이동수단":"이동수단"}},\n'
+        f'      ...\n'
+        f'    ]'
+        for i in range(n_days)
+    )
+
+    return f"""[역할]
+당신은 대한민국 국내여행 전문 큐레이터입니다.
+MBTI 심리학과 지역 여행 트렌드를 결합해, 여행자 성향에 딱 맞는 구체적이고 실현 가능한 여행 계획을 제안합니다.
+
+[여행자 정보]
+- 인원: {len(members)}명
+- MBTI: {mbti_summary}
+- 성별/나이: {gender_age}
+- 각 MBTI 성향:
 {member_lines}
 
 [여행 조건]
-- 여행 기간: {duration_label} (총 {n_days}일)
-- {region_line}
-- {themes_line}
+- 기간: {duration_label} (총 {n_days}일, 숙박 {n_days-1}박)
+- 희망 지역: {region_str}
+- 선호 테마: {themes_str}
 
-반드시 순수 JSON만 출력하세요 (마크다운 코드블록 없이):
+[출력 형식]
+반드시 아래 JSON 구조만 출력하세요. 마크다운 코드블록(`````), 설명 텍스트 절대 금지.
+
 {{
-  "top_destination": "1위 여행지명",
-  "trip_concept": "이번 여행의 컨셉 한 줄 (예: 부산 핫플 찍먹 투어, 제주 동쪽 완전 정복 등)",
+  "top_destination": "최종 선정 여행지명 (예: 전주, 강릉, 제주 동부)",
+  "trip_concept": "이번 여행 컨셉을 15자 이내로 (예: 전주 골목 감성 완전 정복, 강릉 바다+커피 힐링)",
   "recommendations": [
-    {{"rank": 1, "name": "여행지명", "address": "도로명주소 (시/군/구/동 포함)", "reason": "MBTI와 연결한 선정 이유 2~3문장"}},
-    {{"rank": 2, "name": "여행지명", "address": "도로명주소", "reason": "선정 이유 2~3문장"}},
-    {{"rank": 3, "name": "여행지명", "address": "도로명주소", "reason": "선정 이유 2~3문장"}}
+    {{
+      "rank": 1,
+      "name": "여행지명 (구/동 단위까지)",
+      "address": "실제 도로명주소",
+      "reason": "이 MBTI 조합이 이 여행지를 좋아하는 이유를 구체적으로 2~3문장"
+    }},
+    {{"rank": 2, "name": "...", "address": "...", "reason": "..."}},
+    {{"rank": 3, "name": "...", "address": "...", "reason": "..."}}
   ],
-  "mbti_analysis": "MBTI 조합 여행 스타일을 재미있게 3~4문장",
-  "tips": ["팁1", "팁2", "팁3"],
-  "schedule": {{{schedule_keys}}}{food_schema}{stay_schema}
+  "mbti_analysis": "멤버들의 MBTI 조합이 만들어내는 여행 시너지와 주의할 갈등 포인트를 재미있고 현실적으로 3~4문장",
+  "tips": [
+    "이 지역+이 MBTI 조합에 특화된 실용 팁 (교통, 예약, 시간대 등)",
+    "팁2",
+    "팁3"
+  ],
+  "schedule": {{
+{schedule_schema}
+  }}{stay_schema}
 }}
 
-일정 항목 형식:
-{{"시간": "HH:MM", "장소": "장소명", "활동": "활동명", "상세내용": "설명 1~2문장", "이동수단": "교통수단"}}
-
-일정 작성 규칙:
-- 오전부터 마지막 날 저녁까지 빠짐없이 작성. 식사/이동/관광/숙박 모두 포함.
-- 【동선 핵심】지리적으로 한 방향으로 흘러가는 일정을 짜라. A→B→C→D처럼 이동하되 같은 곳을 왕복하지 마라.
-- 하루에 여러 도시를 억지로 넣지 말고, 한 지역을 깊게 파거나 인접 지역을 자연스럽게 연결하라.
-- 예를 들어 서울/경기/인천이면: "홍대-연남동-마포 감성 투어" 처럼 하나의 컨셉으로 동선을 묶어라.{food_rule}{stay_rule}
+[일정 작성 필수 규칙]
+1. 매 일차 오전 기상(07:00~09:00)부터 취침 전(21:00~23:00)까지 빈 시간 없이 작성
+2. 식사(아침/점심/저녁), 이동, 관광, 휴식, 숙박 체크인 모두 포함
+3. 동선 규칙: 지리적으로 한 방향으로만 이동 (A→B→C→D). 같은 지점 왕복 절대 금지
+4. 하루 안에서 한 동네를 깊게 탐방하거나, 자연스럽게 인접 지역으로 이동하는 흐름으로 구성
+5. 장소명은 실제 존재하는 명칭 사용 (관광지, 거리, 시장 등 실제 이름)
+6. 상세내용은 "왜 이곳인지 + 무엇을 할 수 있는지" 2문장으로 구체적으로 작성{stay_rule}
 """
 
 
@@ -453,13 +487,13 @@ def run_all(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": (
-                    "당신은 10년 경력의 국내 여행 전문가이자 MBTI 심리 전문가입니다. "
-                    "여행자의 성향을 깊이 이해하고, 실제로 가볼 만한 숨은 명소와 검증된 맛집을 포함해 "
-                    "현실적이고 알찬 일정을 구성합니다. "
-                    "맛집 추천 시 실제 영업 중인 가게만 추천하고, 주소도 실제 도로명 주소를 정확히 기재하세요. "
-                    "불확실하거나 폐업 가능성이 있는 곳은 절대 추천하지 마세요. "
-                    "답변은 항상 따뜻하고 친근한 말투로, 여행이 기대되도록 생생하게 작성합니다. "
-                    "반드시 요청한 JSON 형식만 출력하세요."
+                    "당신은 대한민국 국내여행 큐레이터입니다. 다음 규칙을 반드시 지키세요:\n"
+                    "1. 출력은 순수 JSON만. 마크다운 코드블록(```)이나 설명 텍스트 절대 금지.\n"
+                    "2. JSON 키 이름을 절대 바꾸지 마세요. 요청한 구조 그대로 출력.\n"
+                    "3. 장소명은 실제 존재하는 곳만 사용. 창작 금지.\n"
+                    "4. 일정은 시간 순서대로, 빈 시간 없이 촘촘하게 작성.\n"
+                    "5. 동선은 지리적으로 한 방향 흐름 유지. 왕복 이동 금지.\n"
+                    "6. MBTI 분석은 실제 심리학 기반으로 재미있고 공감 가능하게."
                 )},
                 {"role": "user", "content": prompt},
             ],
