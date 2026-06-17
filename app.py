@@ -870,7 +870,10 @@ ul[role="listbox"] {
     --block-label-text-color: #1E3A8A !important;
     --input-background-fill: #FFFFFF !important;
     --input-border-color: #93C5FD !important;
-    --checkbox-background-color: #FFFFFF !important;
+    --checkbox-background-color: transparent !important;
+    --checkbox-background-color-selected: #2563EB !important;
+    --checkbox-border-color-selected: #1D4ED8 !important;
+    --checkbox-label-text-color: inherit !important;
 }
 body, .gradio-container {
     background: #F8FAFF !important;
@@ -956,9 +959,9 @@ input[type="checkbox"] {
     appearance: none !important;
     width: 17px !important;
     height: 17px !important;
-    border: 2px solid #93C5FD !important;
+    border: 2px solid #3B82F6 !important;
     border-radius: 3px !important;
-    background: white !important;
+    background: transparent !important;
     cursor: pointer !important;
     position: relative !important;
     flex-shrink: 0 !important;
@@ -969,7 +972,7 @@ input[type="checkbox"] {
 }
 input[type="checkbox"]:checked {
     background: #2563EB !important;
-    border-color: #1D4ED8 !important;
+    border-color: #2563EB !important;
 }
 input[type="checkbox"]:checked::after {
     content: "" !important;
@@ -979,13 +982,14 @@ input[type="checkbox"]:checked::after {
     top: 0px !important;
     width: 5px !important;
     height: 9px !important;
-    border: 2.5px solid white !important;
+    border: 2.5px solid #FFFFFF !important;
     border-top: none !important;
     border-left: none !important;
     transform: rotate(45deg) !important;
 }
 input[type="checkbox"]:hover {
     border-color: #2563EB !important;
+    background: rgba(59,130,246,0.1) !important;
 }
 
 /* ── 성별 라디오 가로 한 줄 배치 ── */
