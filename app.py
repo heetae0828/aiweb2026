@@ -562,7 +562,7 @@ with gr.Blocks(title="AI 국내 여행 도우미", theme=gr.themes.Soft(), css=C
                     mbti   = gr.Dropdown(choices=MBTI_LIST, label=mbti_label, scale=2)
                     gender = gr.Radio(choices=["남", "여", "미선택"], value="미선택",
                                       label="성별", scale=1)
-                    age    = gr.Number(label="나이", precision=0, scale=1)
+                    age    = gr.Number(label="나이", precision=0, scale=1, minimum=0)
                 rows.append(row)
                 mbtis.append(mbti)
                 genders.append(gender)
