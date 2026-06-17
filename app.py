@@ -22,10 +22,10 @@ MAX_MEMBERS = 15
 
 # ── 상수 ────────────────────────────────────────────────────────────────────
 MBTI_LIST = [
-    "ISTJ", "ISFJ", "INFJ", "INTJ",
-    "ISTP", "ISFP", "INFP", "INTP",
-    "ESTP", "ESFP", "ENFP", "ENTP",
-    "ESTJ", "ESFJ", "ENFJ", "ENTJ",
+    "ISTJ", "ISFJ", "INTJ", "INFJ",
+    "ISTP", "ISFP", "INTP", "INFP",
+    "ESTJ", "ESFJ", "ENTJ", "ENFJ",
+    "ESTP", "ESFP", "ENTP", "ENFP",
 ]
 REGION_TREE = {
     "(필수 선택)": [],
