@@ -81,37 +81,49 @@ def _naver_local_search(query: str, client_id: str, client_secret: str, display:
         "X-Naver-Client-Secret": client_secret,
     })
     try:
-        with urllib.request.urlopen(req, timeout=6) as resp:
+        with urllib.request.urlopen(req, timeout=4) as resp:
             return json.loads(resp.read()).get("items", [])
     except Exception:
         return []
 
 
 def _search_naver_restaurants(region: str, client_id: str, client_secret: str) -> dict:
-    result = {}
-    seen: set = set()
-    for cat, query_tmpl in _NAVER_FOOD_QUERIES.items():
+    import concurrent.futures
+
+    def fetch_cat(cat_queries):
+        cat, query_tmpls = cat_queries
+        seen_local: set = set()
         items = []
-        for tmpl in query_tmpl:
+        for tmpl in query_tmpls:
             q = tmpl.format(r=region)
             for raw in _naver_local_search(q, client_id, client_secret, display=5):
                 name = re.sub(r"<[^>]+>", "", raw.get("title", "")).strip()
                 addr = raw.get("roadAddress", "") or raw.get("address", "")
-                link = raw.get("link", "")
                 key  = name + addr
-                if key in seen or not name:
+                if key in seen_local or not name:
                     continue
-                seen.add(key)
+                seen_local.add(key)
                 items.append({
                     "name":    name,
                     "address": addr,
                     "desc":    raw.get("category", ""),
                     "price":   "",
-                    "link":    link,
+                    "link":    raw.get("link", ""),
                 })
             if len(items) >= 10:
                 break
-        result[cat] = items[:10]
+        return cat, items[:10]
+
+    result = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(fetch_cat, (cat, tmpls)): cat
+                   for cat, tmpls in _NAVER_FOOD_QUERIES.items()}
+        for future in concurrent.futures.as_completed(futures, timeout=20):
+            try:
+                cat, items = future.result()
+                result[cat] = items
+            except Exception:
+                result[futures[future]] = []
     return result
 
 
