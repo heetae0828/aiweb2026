@@ -7,6 +7,7 @@ import os
 import re
 import tempfile
 import urllib.parse
+import urllib.request
 from datetime import date, timedelta
 
 import gradio as gr
@@ -59,6 +60,60 @@ MBTI_TRAITS = {
 }
 DURATIONS = ["당일치기", "1박2일", "2박3일", "3박4일", "4박5일 이상"]
 DURATION_DAYS = {"당일치기": 1, "1박2일": 2, "2박3일": 3, "3박4일": 4, "4박5일 이상": 5}
+
+# ── 네이버 로컬 검색 ────────────────────────────────────────────────────────
+_NAVER_FOOD_QUERIES = {
+    "아침":     ["{r} 아침식사 맛집", "{r} 조식 맛집"],
+    "점심":     ["{r} 점심 맛집", "{r} 한식 맛집"],
+    "저녁":     ["{r} 저녁 맛집", "{r} 고기 맛집"],
+    "카페":     ["{r} 카페", "{r} 디저트 카페"],
+    "분위기맛집": ["{r} 분위기 좋은 식당", "{r} 뷰 맛집"],
+}
+
+
+def _naver_local_search(query: str, client_id: str, client_secret: str, display: int = 5) -> list:
+    url = (
+        "https://openapi.naver.com/v1/search/local.json"
+        f"?query={urllib.parse.quote(query)}&display={display}&sort=comment"
+    )
+    req = urllib.request.Request(url, headers={
+        "X-Naver-Client-Id": client_id,
+        "X-Naver-Client-Secret": client_secret,
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            return json.loads(resp.read()).get("items", [])
+    except Exception:
+        return []
+
+
+def _search_naver_restaurants(region: str, client_id: str, client_secret: str) -> dict:
+    result = {}
+    seen: set = set()
+    for cat, query_tmpl in _NAVER_FOOD_QUERIES.items():
+        items = []
+        for tmpl in query_tmpl:
+            q = tmpl.format(r=region)
+            for raw in _naver_local_search(q, client_id, client_secret, display=5):
+                name = re.sub(r"<[^>]+>", "", raw.get("title", "")).strip()
+                addr = raw.get("roadAddress", "") or raw.get("address", "")
+                link = raw.get("link", "")
+                key  = name + addr
+                if key in seen or not name:
+                    continue
+                seen.add(key)
+                items.append({
+                    "name":    name,
+                    "address": addr,
+                    "desc":    raw.get("category", ""),
+                    "price":   "",
+                    "link":    link,
+                })
+            if len(items) >= 10:
+                break
+        result[cat] = items[:10]
+    return result
+
 
 # ── 한국어 폰트 ──────────────────────────────────────────────────────────────
 def _find_ko_font():
@@ -121,20 +176,8 @@ def _build_prompt(members, duration_label, n_days, region, themes):
     has_stay = n_days > 1
 
     food_schema = ""
-    if is_food:
-        food_schema = """,
-  "restaurants": {
-    "아침": [{"name": "식당명", "address": "주소", "desc": "한 줄 설명", "price": "1인 가격대"}, ...10개],
-    "점심": [...10개],
-    "저녁": [...10개],
-    "카페": [...10개],
-    "분위기맛집": [...10개]
-  }"""
-
     food_rule = ""
-    if is_food:
-        food_rule = """
-- restaurants: 아침/점심/저녁/카페/분위기맛집 각 10개, 전체 50개 중복 없이. 반드시 실제로 영업 중인 검증된 가게만 추천하라. 가게 이름, 실제 도로명 주소, 한 줄 설명, 1인 가격대 포함. 불확실하거나 폐업했을 가능성이 있는 곳은 절대 포함하지 마라."""
+    # 맛집은 AI 대신 네이버 로컬 API로 검색하므로 프롬프트에서 제외
 
     stay_rule = ""
     if has_stay:
@@ -424,6 +467,15 @@ def run_all(
         is_food   = "맛집 탐방" in themes
         has_stay  = n_days > 1
 
+        # ── 네이버 로컬 API로 실제 맛집 검색 ──────────────────────────────
+        naver_restaurants = {}
+        naver_id     = os.getenv("NAVER_CLIENT_ID", "")
+        naver_secret = os.getenv("NAVER_CLIENT_SECRET", "")
+        if is_food and naver_id and naver_secret:
+            search_region = region or top_dest
+            yield _loading_html("🍽️ 네이버에서 실제 맛집·카페를 검색하는 중...", 6), "", "", gr.update(visible=False, value=None)
+            naver_restaurants = _search_naver_restaurants(search_region, naver_id, naver_secret)
+
         rec_html = '<div style="font-family:\'Apple SD Gothic Neo\',\'Nanum Gothic\',sans-serif">'
 
         # 여행 컨셉
@@ -512,10 +564,17 @@ def run_all(
 </div>"""
                 rec_html += '</div>'
 
-        # ── 맛집 리스트 ────────────────────────────────────────────────────
+        # ── 맛집 리스트 (네이버 로컬 API 결과 우선) ───────────────────────
         if is_food:
-            restaurants = data.get("restaurants", {})
+            restaurants = naver_restaurants if naver_restaurants else {}
             cat_icons = {"아침": "🌅", "점심": "☀️", "저녁": "🌙", "카페": "☕", "분위기맛집": "✨"}
+            if not naver_id or not naver_secret:
+                rec_html += """
+<hr style="border:none;border-top:1px solid #E5E7EB;margin:16px 0">
+<div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:12px 16px;font-size:13px;color:#92400E">
+  ⚠️ <b>NAVER_CLIENT_ID / NAVER_CLIENT_SECRET</b> 환경변수가 설정되지 않아 맛집 검색을 건너뜁니다.<br>
+  HuggingFace Spaces → Settings → Repository secrets 에서 등록해주세요.
+</div>"""
             if restaurants:
                 rec_html += """
 <hr style="border:none;border-top:1px solid #E5E7EB;margin:16px 0">
@@ -532,14 +591,18 @@ def run_all(
                         addr    = item.get("address", "")
                         desc    = item.get("desc", "")
                         price   = item.get("price", "")
-                        map_url = f"https://map.naver.com/p/search/{urllib.parse.quote(name+' '+addr)}" if name else ""
+                        # 네이버 API link 우선, 없으면 네이버 플레이스 검색
+                        place_url = (
+                            item.get("link")
+                            or f"https://map.naver.com/p/search/{urllib.parse.quote((name+' '+addr).strip())}"
+                        )
                         return f"""<div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px">
   <div style="font-weight:bold;font-size:13.5px;margin-bottom:2px">
-    <a href="{map_url}" target="_blank" style="color:#92400E;text-decoration:none">{name} 📍</a>
+    <a href="{place_url}" target="_blank" style="color:#92400E;text-decoration:none">{name} 📍</a>
   </div>
   <div style="font-size:12px;color:#6B7280;margin-bottom:4px">{addr}</div>
   <div style="font-size:12.5px;color:#374151;margin-bottom:4px">{desc}</div>
-  <div style="font-size:12px;font-weight:bold;color:#B45309">{price}</div>
+  {"<div style='font-size:12px;font-weight:bold;color:#B45309'>"+price+"</div>" if price else ""}
 </div>"""
 
                     shown = items[:3]
