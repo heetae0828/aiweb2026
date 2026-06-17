@@ -449,12 +449,17 @@ def run_all(
         n_days = DURATION_DAYS.get(duration, 1)
         duration_label = duration
 
-    # 선택된 지역 결정
+    # 선택된 지역 결정 — 도/광역시만 선택한 경우 랜덤 시/군 선택
+    import random
     region = ""
     if city and city not in ("(선택 사항)", None):
         region = city
     elif province and province not in ("(필수 선택)", None):
-        region = province
+        cities = REGION_TREE.get(province, [])
+        if cities:
+            region = random.choice(cities)  # 매번 다른 시/군 추천
+        else:
+            region = province
 
     if not region and not themes:
         yield "❌ 지역 또는 테마 중 하나 이상 선택해주세요.", "", "", gr.update(visible=False, value=None)
@@ -636,7 +641,13 @@ def run_all(
         # ── 맛집 리스트 (네이버 로컬 API 결과 항상 표시) ──────────────────
         if True:
             restaurants = naver_restaurants if naver_restaurants else {}
-            cat_icons = {"아침": "🌅", "점심": "☀️", "저녁": "🌙", "카페": "☕", "분위기맛집": "✨"}
+            # 맛집 탐방 테마: 5개 카테고리 전부 + 더보기
+            # 일반: 점심·저녁·카페 3개만, 각 3개씩만 표시
+            if is_food:
+                cat_icons = {"아침": "🌅", "점심": "☀️", "저녁": "🌙", "카페": "☕", "분위기맛집": "✨"}
+            else:
+                cat_icons = {"점심": "☀️", "저녁": "🌙", "카페": "☕"}
+
             if not naver_id or not naver_secret:
                 rec_html += """
 <hr style="border:none;border-top:1px solid #E5E7EB;margin:16px 0">
@@ -676,8 +687,15 @@ def run_all(
   {"<div style='font-size:12px;font-weight:bold;color:#B45309'>"+price+"</div>" if price else ""}
 </div>"""
 
-                    shown = items[:3]
-                    hidden = items[3:]
+                    if is_food:
+                        # 맛집 탐방: 3개 보여주고 더보기
+                        shown = items[:3]
+                        hidden = items[3:]
+                    else:
+                        # 일반: 3개만 표시, 더보기 없음
+                        shown = items[:3]
+                        hidden = []
+
                     rec_html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px">'
                     for item in shown:
                         rec_html += _item_card(item)
