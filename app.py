@@ -133,7 +133,7 @@ def _build_prompt(members, duration_label, n_days, region, themes):
     food_rule = ""
     if is_food:
         food_rule = """
-- restaurants: 아침/점심/저녁/카페/분위기맛집 각 10개, 전체 50개 중복 없이. 실제 존재하는 가게 이름, 주소, 간단한 설명, 1인 가격대 포함."""
+- restaurants: 아침/점심/저녁/카페/분위기맛집 각 10개, 전체 50개 중복 없이. 반드시 실제로 영업 중인 검증된 가게만 추천하라. 가게 이름, 실제 도로명 주소, 한 줄 설명, 1인 가격대 포함. 불확실하거나 폐업했을 가능성이 있는 곳은 절대 포함하지 마라."""
 
     stay_rule = ""
     if has_stay:
@@ -321,9 +321,11 @@ def run_all(
     for i in range(actual_count):
         mbti, gender, age = all_data[i]
         if not mbti and mbti_required:
-            return f"❌ 멤버{i+1}의 MBTI를 선택해주세요.", "", "", gr.update(visible=False, value=None)
+            yield f"❌ 멤버{i+1}의 MBTI를 선택해주세요.", "", "", gr.update(visible=False, value=None)
+            return
         if not age or age <= 0:
-            return f"❌ 멤버{i+1}의 나이를 입력해주세요.", "", "", gr.update(visible=False, value=None)
+            yield f"❌ 멤버{i+1}의 나이를 입력해주세요.", "", "", gr.update(visible=False, value=None)
+            return
         active.append((mbti or None, gender, age))
 
     # 여행 기간 결정
@@ -342,30 +344,71 @@ def run_all(
         region = province
 
     if not region and not themes:
-        return "❌ 지역 또는 테마 중 하나 이상 선택해주세요.", "", "", gr.update(visible=False, value=None)
+        yield "❌ 지역 또는 테마 중 하나 이상 선택해주세요.", "", "", gr.update(visible=False, value=None)
+        return
 
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key:
-        return "❌ OPENAI_API_KEY가 설정되지 않았습니다.", "", "", gr.update(visible=False, value=None)
+        yield "❌ OPENAI_API_KEY가 설정되지 않았습니다.", "", "", gr.update(visible=False, value=None)
+        return
+
+    def _loading_html(msg, step, total=6):
+        bar = "█" * step + "░" * (total - step)
+        return f"""<div style="font-family:'Apple SD Gothic Neo','Nanum Gothic',sans-serif;
+                              padding:32px 24px;text-align:center">
+  <div style="font-size:42px;margin-bottom:16px">✈️</div>
+  <div style="font-size:18px;font-weight:bold;color:#1D4ED8;margin-bottom:10px">{msg}</div>
+  <div style="font-size:22px;letter-spacing:4px;color:#3B82F6;margin-bottom:8px">{bar}</div>
+  <div style="font-size:13px;color:#6B7280">AI가 최적의 여행 계획을 만들고 있습니다 — 잠시만 기다려주세요 🙏</div>
+</div>"""
 
     try:
         client = OpenAI(api_key=api_key)
         prompt = _build_prompt(active, duration_label, n_days, region, themes)
-        response = client.chat.completions.create(
+
+        # ── 스트리밍 로딩 메시지 ──────────────────────────────────────────
+        step_msgs = [
+            ("🔍 멤버 MBTI 성향을 분석하는 중...", 1),
+            ("🗺️ 최적의 여행지를 탐색하는 중...", 2),
+            ("📅 맞춤 여행 일정을 구성하는 중...", 3),
+            ("🍽️ 맛집 & 숙소 정보를 수집하는 중...", 4),
+            ("📝 여행 계획서를 다듬는 중...", 5),
+        ]
+        step_thresholds = [100, 500, 1200, 2200, 3500]
+        step_idx = 0
+
+        yield _loading_html("🚀 여행 플랜 생성을 시작합니다!", 0), "", "", gr.update(visible=False, value=None)
+
+        stream = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": (
                     "당신은 10년 경력의 국내 여행 전문가이자 MBTI 심리 전문가입니다. "
                     "여행자의 성향을 깊이 이해하고, 실제로 가볼 만한 숨은 명소와 검증된 맛집을 포함해 "
                     "현실적이고 알찬 일정을 구성합니다. "
+                    "맛집 추천 시 실제 영업 중인 가게만 추천하고, 주소도 실제 도로명 주소를 정확히 기재하세요. "
+                    "불확실하거나 폐업 가능성이 있는 곳은 절대 추천하지 마세요. "
                     "답변은 항상 따뜻하고 친근한 말투로, 여행이 기대되도록 생생하게 작성합니다. "
                     "반드시 요청한 JSON 형식만 출력하세요."
                 )},
                 {"role": "user", "content": prompt},
             ],
             max_tokens=8192,
+            stream=True,
         )
-        raw = response.choices[0].message.content.strip()
+
+        raw = ""
+        token_count = 0
+        for chunk in stream:
+            token = chunk.choices[0].delta.content or ""
+            raw += token
+            token_count += len(token)
+            while step_idx < len(step_thresholds) and token_count >= step_thresholds[step_idx]:
+                msg, step = step_msgs[step_idx]
+                yield _loading_html(msg, step), "", "", gr.update(visible=False, value=None)
+                step_idx += 1
+
+        raw = raw.strip()
         raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.MULTILINE)
         raw = re.sub(r"\s*```\s*$", "", raw, flags=re.MULTILINE)
         m = re.search(r"\{.*\}", raw, re.DOTALL)
@@ -419,7 +462,7 @@ def run_all(
         # ── 숙박 추천 + 예약 링크 ──────────────────────────────────────────
         if has_stay:
             top_dest_q = urllib.parse.quote(top_dest)
-            yeogi_url  = f"https://www.yeogieottae.com/search?keyword={top_dest_q}&adult={actual_count}"
+            yeogi_url  = f"https://www.yeogi.com/search?keyword={top_dest_q}&numberOfPeople={actual_count}"
             agoda_url  = f"https://www.agoda.com/ko-kr/search?city={top_dest_q}&rooms=1&adults={actual_count}"
             rec_html += f"""
 <hr style="border:none;border-top:1px solid #E5E7EB;margin:16px 0">
@@ -445,7 +488,7 @@ def run_all(
                 rec_html += '<div style="display:flex;flex-direction:column;gap:8px">'
                 for acc in accommodations:
                     acc_q = urllib.parse.quote(f"{acc.get('name','')} {acc.get('area','')}")
-                    yeogi_acc = f"https://www.yeogieottae.com/search?keyword={acc_q}&adult={actual_count}"
+                    yeogi_acc = f"https://www.yeogi.com/search?keyword={acc_q}&numberOfPeople={actual_count}"
                     rec_html += f"""
 <div style="background:#FFF5F5;border-left:4px solid #FF5A5F;padding:10px 14px;border-radius:0 8px 8px 0">
   <div style="font-weight:bold;font-size:14px;margin-bottom:2px">
@@ -469,16 +512,16 @@ def run_all(
                     items = restaurants.get(cat, [])
                     if not items:
                         continue
+                    cat_id = cat.replace(" ", "_")
                     rec_html += f'<h3 style="color:#1E40AF;margin:14px 0 8px">{icon} {cat}</h3>'
-                    rec_html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px">'
-                    for item in items:
+
+                    def _item_card(item):
                         name    = item.get("name", "")
                         addr    = item.get("address", "")
                         desc    = item.get("desc", "")
                         price   = item.get("price", "")
                         map_url = f"https://map.naver.com/p/search/{urllib.parse.quote(name+' '+addr)}" if name else ""
-                        rec_html += f"""
-<div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px">
+                        return f"""<div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px">
   <div style="font-weight:bold;font-size:13.5px;margin-bottom:2px">
     <a href="{map_url}" target="_blank" style="color:#92400E;text-decoration:none">{name} 📍</a>
   </div>
@@ -486,7 +529,29 @@ def run_all(
   <div style="font-size:12.5px;color:#374151;margin-bottom:4px">{desc}</div>
   <div style="font-size:12px;font-weight:bold;color:#B45309">{price}</div>
 </div>"""
+
+                    shown = items[:3]
+                    hidden = items[3:]
+                    rec_html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px">'
+                    for item in shown:
+                        rec_html += _item_card(item)
                     rec_html += '</div>'
+
+                    if hidden:
+                        rec_html += f'<div id="more_{cat_id}" style="display:none;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;margin-top:8px">'
+                        for item in hidden:
+                            rec_html += _item_card(item)
+                        rec_html += '</div>'
+                        rec_html += f"""<button onclick="(function(){{
+  var m=document.getElementById('more_{cat_id}');
+  var b=document.getElementById('btn_{cat_id}');
+  if(m.style.display==='none'){{m.style.display='grid';b.textContent='▲ 접기';}}
+  else{{m.style.display='none';b.textContent='+ 더보기 ({len(hidden)}개)';}}
+}})()" id="btn_{cat_id}"
+  style="margin-top:8px;padding:7px 16px;background:#FFFBEB;border:1px solid #FCD34D;
+         border-radius:6px;cursor:pointer;font-size:13px;color:#92400E;font-weight:bold">
+  + 더보기 ({len(hidden)}개)
+</button>"""
 
         rec_html += "</div>"
 
@@ -504,12 +569,12 @@ def run_all(
         else:
             pdf_link_html = ""
 
-        return rec_html, sched_html, pdf_link_html, gr.update(visible=bool(pdf_path), value=pdf_path)
+        yield rec_html, sched_html, pdf_link_html, gr.update(visible=bool(pdf_path), value=pdf_path)
 
     except json.JSONDecodeError as e:
-        return f"<p>❌ 응답 파싱 오류: {e}</p>", "", "", gr.update(visible=False, value=None)
+        yield f"<p>❌ 응답 파싱 오류: {e}</p>", "", "", gr.update(visible=False, value=None)
     except Exception as e:
-        return f"<p>❌ 오류: {e}</p>", "", "", gr.update(visible=False, value=None)
+        yield f"<p>❌ 오류: {e}</p>", "", "", gr.update(visible=False, value=None)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
