@@ -528,6 +528,41 @@ input[type="checkbox"]:checked::after {
 input[type="checkbox"]:hover {
     border-color: #2563EB !important;
 }
+
+/* ── 성별 라디오 가로 한 줄 배치 ── */
+.gender-radio .wrap {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    align-items: center !important;
+}
+.gender-radio .wrap label {
+    white-space: nowrap !important;
+}
+
+/* ── MBTI 드롭다운 폰트 가독성 개선 ── */
+.gradio-dropdown input,
+.gradio-dropdown .svelte-select,
+.gradio-dropdown [data-testid="dropdown-select"] {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    font-family: 'Apple SD Gothic Neo', 'Nanum Gothic', 'Malgun Gothic', sans-serif !important;
+    color: #1E3A8A !important;
+    letter-spacing: 0.5px !important;
+}
+ul[role="listbox"] li {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    font-family: 'Apple SD Gothic Neo', 'Nanum Gothic', 'Malgun Gothic', sans-serif !important;
+    color: #1E293B !important;
+    letter-spacing: 0.5px !important;
+    padding: 8px 12px !important;
+}
+ul[role="listbox"] li:hover {
+    background: #DBEAFE !important;
+    color: #1D4ED8 !important;
+}
 """
 
 with gr.Blocks(title="AI 국내 여행 도우미", theme=gr.themes.Soft(), css=CSS) as demo:
@@ -561,7 +596,7 @@ with gr.Blocks(title="AI 국내 여행 도우미", theme=gr.themes.Soft(), css=C
                     mbti_label = f"멤버{i+1} MBTI" if i < 2 else f"멤버{i+1} MBTI (선택)"
                     mbti   = gr.Dropdown(choices=MBTI_LIST, label=mbti_label, scale=2)
                     gender = gr.Radio(choices=["남", "여", "미선택"], value="미선택",
-                                      label="성별", scale=1)
+                                      label="성별", scale=1, elem_classes=["gender-radio"])
                     age    = gr.Number(label="나이", precision=0, scale=1, minimum=0)
                 rows.append(row)
                 mbtis.append(mbti)
