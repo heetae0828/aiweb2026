@@ -7,6 +7,7 @@ import os
 import re
 import tempfile
 import urllib.parse
+from datetime import date, timedelta
 
 import gradio as gr
 import matplotlib
@@ -461,39 +462,50 @@ def run_all(
 
         # ── 숙박 추천 + 예약 링크 ──────────────────────────────────────────
         if has_stay:
-            top_dest_q = urllib.parse.quote(top_dest)
-            yeogi_url  = f"https://www.yeogi.com/search?keyword={top_dest_q}&numberOfPeople={actual_count}"
-            agoda_url  = f"https://www.agoda.com/ko-kr/search?city={top_dest_q}&rooms=1&adults={actual_count}"
+            n_nights = n_days - 1
+            checkin_date  = date.today() + timedelta(days=1)
+            checkout_date = checkin_date + timedelta(days=n_nights)
+            checkin_str  = checkin_date.strftime("%Y-%m-%d")
+            checkout_str = checkout_date.strftime("%Y-%m-%d")
+
+            def _yeogi_url(keyword, ci=checkin_str, co=checkout_str):
+                kw = urllib.parse.quote(keyword)
+                return (f"https://www.yeogi.com/domestic-accommodations"
+                        f"?keyword={kw}&checkIn={ci}&checkOut={co}"
+                        f"&personal={actual_count}&typoCorrect=true&nonAffiliated=true")
+
             rec_html += f"""
 <hr style="border:none;border-top:1px solid #E5E7EB;margin:16px 0">
 <h2 style="color:#1D4ED8">🏨 숙소 예약</h2>
 <p style="font-size:13px;color:#6B7280;margin-bottom:10px">
-  {actual_count}명 기준으로 검색합니다. 아래 버튼을 클릭하면 바로 연결됩니다.
+  {actual_count}명 · {checkin_str} ~ {checkout_str} ({n_nights}박) 기준으로 검색합니다.
 </p>
-<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
-  <a href="{yeogi_url}" target="_blank"
+<div style="margin-bottom:12px">
+  <a href="{_yeogi_url(top_dest)}" target="_blank"
      style="background:#FF5A5F;color:white;padding:10px 18px;border-radius:8px;
             text-decoration:none;font-weight:bold;font-size:14px">
     🏠 여기어때에서 찾기
   </a>
-  <a href="{agoda_url}" target="_blank"
-     style="background:#5C2D8C;color:white;padding:10px 18px;border-radius:8px;
-            text-decoration:none;font-weight:bold;font-size:14px">
-    🌐 아고다에서 찾기
-  </a>
 </div>"""
-            # AI 추천 숙소 목록
+            # AI 추천 숙소 목록 (다중 지역이면 날짜 분배)
             accommodations = data.get("accommodation", [])
             if accommodations:
                 rec_html += '<div style="display:flex;flex-direction:column;gap:8px">'
-                for acc in accommodations:
-                    acc_q = urllib.parse.quote(f"{acc.get('name','')} {acc.get('area','')}")
-                    yeogi_acc = f"https://www.yeogi.com/search?keyword={acc_q}&numberOfPeople={actual_count}"
+                for idx, acc in enumerate(accommodations):
+                    # 숙소마다 체크인 날짜를 일차 순서로 배분
+                    acc_ci = (checkin_date + timedelta(days=idx)).strftime("%Y-%m-%d")
+                    acc_co = (checkin_date + timedelta(days=idx + 1)).strftime("%Y-%m-%d")
+                    # 마지막 숙소는 checkout까지
+                    if idx == len(accommodations) - 1:
+                        acc_co = checkout_str
+                    acc_keyword = f"{acc.get('name','')} {acc.get('area','')}"
+                    yeogi_acc = _yeogi_url(acc_keyword, acc_ci, acc_co)
                     rec_html += f"""
 <div style="background:#FFF5F5;border-left:4px solid #FF5A5F;padding:10px 14px;border-radius:0 8px 8px 0">
   <div style="font-weight:bold;font-size:14px;margin-bottom:2px">
     🏨 {acc.get('name','')} <span style="color:#6B7280;font-weight:normal;font-size:12px">({acc.get('area','')} · {acc.get('type','')})</span>
   </div>
+  <div style="font-size:12px;color:#6B7280;margin-bottom:4px">체크인 {acc_ci} → 체크아웃 {acc_co}</div>
   <div style="font-size:13px;color:#374151;margin-bottom:6px">1박 {acc.get('price_per_night','')}</div>
   <a href="{yeogi_acc}" target="_blank"
      style="font-size:12px;color:#FF5A5F;text-decoration:none">여기어때에서 검색 →</a>
