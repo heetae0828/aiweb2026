@@ -72,9 +72,15 @@ _NAVER_FOOD_QUERIES = {
 
 
 def _extract_place_id(raw_link: str) -> str | None:
-    """네이버 API link 필드에서 place ID 추출. 없으면 None."""
+    """네이버 API link 필드에서 place ID 추출. 없으면 None.
+    Naver Local Search API link는 가게 홈페이지 URL이므로 place ID가 없는 경우가 대부분."""
     if not raw_link:
         return None
+    # map.naver.com/local/siteview.nhn?code=XXXXXXXX 형태
+    m = re.search(r"code=(\d+)", raw_link)
+    if m:
+        return m.group(1)
+    # map.naver.com/p/entry/place/XXXXXXXX 형태
     m = re.search(r"/place/(\d+)", raw_link)
     return m.group(1) if m else None
 
@@ -114,15 +120,18 @@ def _search_naver_restaurants(region: str, client_id: str, client_secret: str) -
                 raw_link = raw.get("link", "")
                 place_id = _extract_place_id(raw_link)
 
-                # place ID 없는 항목은 제외 (검색 URL 방지)
-                if not name or not place_id:
+                if not name:
                     continue
                 key = name + addr
                 if key in global_seen:
                     continue
                 global_seen.add(key)
 
-                place_url = f"https://map.naver.com/p/entry/place/{place_id}"
+                # place ID 있으면 직접 링크, 없으면 이름으로 검색
+                if place_id:
+                    place_url = f"https://map.naver.com/p/entry/place/{place_id}"
+                else:
+                    place_url = f"https://map.naver.com/p/search/{urllib.parse.quote(name)}"
                 items.append({
                     "name":      name,
                     "address":   addr,
@@ -527,11 +536,11 @@ def run_all(
         is_food   = "맛집 탐방" in themes
         has_stay  = n_days > 1
 
-        # ── 네이버 로컬 API로 실제 맛집 검색 ──────────────────────────────
+        # ── 네이버 로컬 API로 실제 맛집 검색 (항상 실행) ─────────────────
         naver_restaurants = {}
         naver_id     = os.getenv("NAVER_CLIENT_ID", "")
         naver_secret = os.getenv("NAVER_CLIENT_SECRET", "")
-        if is_food and naver_id and naver_secret:
+        if naver_id and naver_secret:
             search_region = region or top_dest
             yield _loading_html("🍽️ 네이버에서 실제 맛집·카페를 검색하는 중...", 6), "", "", gr.update(visible=False, value=None)
             naver_restaurants = _search_naver_restaurants(search_region, naver_id, naver_secret)
@@ -624,8 +633,8 @@ def run_all(
 </div>"""
                 rec_html += '</div>'
 
-        # ── 맛집 리스트 (네이버 로컬 API 결과 우선) ───────────────────────
-        if is_food:
+        # ── 맛집 리스트 (네이버 로컬 API 결과 항상 표시) ──────────────────
+        if True:
             restaurants = naver_restaurants if naver_restaurants else {}
             cat_icons = {"아침": "🌅", "점심": "☀️", "저녁": "🌙", "카페": "☕", "분위기맛집": "✨"}
             if not naver_id or not naver_secret:
