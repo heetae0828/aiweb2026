@@ -320,7 +320,16 @@ def run_all(
         prompt = _build_prompt(active, duration_label, n_days, region, themes)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": (
+                    "당신은 10년 경력의 국내 여행 전문가이자 MBTI 심리 전문가입니다. "
+                    "여행자의 성향을 깊이 이해하고, 실제로 가볼 만한 숨은 명소와 검증된 맛집을 포함해 "
+                    "현실적이고 알찬 일정을 구성합니다. "
+                    "답변은 항상 따뜻하고 친근한 말투로, 여행이 기대되도록 생생하게 작성합니다. "
+                    "반드시 요청한 JSON 형식만 출력하세요."
+                )},
+                {"role": "user", "content": prompt},
+            ],
             max_tokens=4096,
         )
         raw = response.choices[0].message.content.strip()
@@ -587,7 +596,7 @@ with gr.Blocks(title="AI 국내 여행 도우미", theme=gr.themes.Soft(), css=C
             for i in range(MAX_MEMBERS):
                 with gr.Row(visible=(i == 0)) as row:
                     mbti_label = f"멤버{i+1} MBTI" if i < 2 else f"멤버{i+1} MBTI (선택)"
-                    mbti   = gr.Dropdown(choices=MBTI_LIST, label=mbti_label, scale=2)
+                    mbti   = gr.Dropdown(choices=MBTI_LIST, label=mbti_label, scale=1)
                     gender = gr.Radio(choices=["남", "여", "미선택"], value="미선택",
                                       label="성별", scale=1, elem_classes=["gender-radio"])
                     age    = gr.Number(label="나이", precision=0, scale=1, minimum=0)
