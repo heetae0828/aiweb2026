@@ -102,6 +102,30 @@ def _naver_local_search(query: str, client_id: str, client_secret: str, display:
         return []
 
 
+def _search_naver_attractions(region: str, client_id: str, client_secret: str) -> list:
+    """네이버 로컬 API로 해당 지역 실제 관광지 목록 수집 - GPT 할루시네이션 방지용."""
+    queries = [
+        f"{region} 관광지",
+        f"{region} 명소",
+        f"{region} 여행지",
+        f"{region} 볼거리",
+    ]
+    seen = set()
+    places = []
+    for q in queries:
+        for raw in _naver_local_search(q, client_id, client_secret, display=5):
+            name = re.sub(r"<[^>]+>", "", raw.get("title", "")).strip()
+            addr = raw.get("roadAddress", "") or raw.get("address", "")
+            cat  = raw.get("category", "")
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            places.append({"name": name, "address": addr, "category": cat})
+        if len(places) >= 15:
+            break
+    return places[:15]
+
+
 def _search_naver_restaurants(region: str, client_id: str, client_secret: str) -> dict:
     import concurrent.futures
 
@@ -203,7 +227,7 @@ def limit_themes(themes):
 
 
 # ── 통합 프롬프트 ────────────────────────────────────────────────────────────
-def _build_prompt(members, duration_label, n_days, region, themes):
+def _build_prompt(members, duration_label, n_days, region, themes, real_attractions=None):
     member_lines = "\n".join(
         f"  - 멤버{i+1}: MBTI={m[0] or '미입력'} ({MBTI_TRAITS.get(m[0], '정보 없음') if m[0] else ''}), 성별={m[1]}, 나이={int(m[2])}세"
         for i, m in enumerate(members)
@@ -244,10 +268,27 @@ def _build_prompt(members, duration_label, n_days, region, themes):
         for i in range(n_days)
     )
 
+    # 실제 관광지 목록 섹션 구성
+    if real_attractions:
+        attraction_lines = "\n".join(
+            f"  - {p['name']} ({p['category']}) | {p['address']}"
+            for p in real_attractions
+        )
+        attraction_section = f"""
+[실제 존재하는 장소 목록] ← 반드시 이 목록에서만 장소를 선택하세요
+아래는 네이버에서 검색된 실제 존재하는 {region_str} 관광지입니다.
+recommendations의 name/address, schedule의 장소는 반드시 아래 목록 안의 장소 또는
+이 장소들과 같은 동네에 실제 존재하는 곳만 사용해야 합니다. 창작 금지.
+
+{attraction_lines}
+"""
+    else:
+        attraction_section = ""
+
     return f"""[역할]
 당신은 대한민국 국내여행 전문 큐레이터입니다.
 MBTI 심리학과 지역 여행 트렌드를 결합해, 여행자 성향에 딱 맞는 구체적이고 실현 가능한 여행 계획을 제안합니다.
-
+{attraction_section}
 [여행자 정보]
 - 인원: {len(members)}명
 - MBTI: {mbti_summary}
@@ -482,12 +523,20 @@ def run_all(
 
     try:
         client = OpenAI(api_key=api_key)
-        prompt = _build_prompt(active, duration_label, n_days, region, themes)
+
+        # ── 네이버 관광지 사전 검색 (할루시네이션 방지) ───────────────────
+        naver_id     = os.getenv("NAVER_CLIENT_ID", "")
+        naver_secret = os.getenv("NAVER_CLIENT_SECRET", "")
+        real_attractions = []
+        if naver_id and naver_secret and region:
+            real_attractions = _search_naver_attractions(region, naver_id, naver_secret)
+
+        prompt = _build_prompt(active, duration_label, n_days, region, themes, real_attractions)
 
         # ── 스트리밍 로딩 메시지 ──────────────────────────────────────────
         step_msgs = [
             ("🔍 멤버 MBTI 성향을 분석하는 중...", 1),
-            ("🗺️ 최적의 여행지를 탐색하는 중...", 2),
+            ("🗺️ 네이버에서 실제 관광지를 확인하는 중...", 2),
             ("📅 맞춤 여행 일정을 구성하는 중...", 3),
             ("🍽️ 맛집 & 숙소 정보를 수집하는 중...", 4),
             ("📝 여행 계획서를 다듬는 중...", 5),
@@ -504,10 +553,12 @@ def run_all(
                     "당신은 대한민국 국내여행 큐레이터입니다. 다음 규칙을 반드시 지키세요:\n"
                     "1. 출력은 순수 JSON만. 마크다운 코드블록(```)이나 설명 텍스트 절대 금지.\n"
                     "2. JSON 키 이름을 절대 바꾸지 마세요. 요청한 구조 그대로 출력.\n"
-                    "3. 장소명은 실제 존재하는 곳만 사용. 창작 금지.\n"
-                    "4. 일정은 시간 순서대로, 빈 시간 없이 촘촘하게 작성.\n"
-                    "5. 동선은 지리적으로 한 방향 흐름 유지. 왕복 이동 금지.\n"
-                    "6. MBTI 분석은 실제 심리학 기반으로 재미있고 공감 가능하게."
+                    "3. [실제 존재하는 장소 목록]이 제공된 경우, 반드시 그 목록 안의 장소만 사용하세요. "
+                    "목록에 없는 장소명을 창작하거나 추측하는 것은 엄격히 금지됩니다.\n"
+                    "4. 장소의 주소는 실제 도로명 주소를 그대로 사용하세요. 임의로 만들지 마세요.\n"
+                    "5. 일정은 시간 순서대로, 빈 시간 없이 촘촘하게 작성.\n"
+                    "6. 동선은 지리적으로 한 방향 흐름 유지. 왕복 이동 금지.\n"
+                    "7. MBTI 분석은 실제 심리학 기반으로 재미있고 공감 가능하게."
                 )},
                 {"role": "user", "content": prompt},
             ],
@@ -543,8 +594,6 @@ def run_all(
 
         # ── 네이버 로컬 API로 실제 맛집 검색 (항상 실행) ─────────────────
         naver_restaurants = {}
-        naver_id     = os.getenv("NAVER_CLIENT_ID", "")
-        naver_secret = os.getenv("NAVER_CLIENT_SECRET", "")
         if naver_id and naver_secret:
             search_region = region or top_dest
             yield _loading_html("🍽️ 네이버에서 실제 맛집·카페를 검색하는 중...", 6), "", "", gr.update(visible=False, value=None)
