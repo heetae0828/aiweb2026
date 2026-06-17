@@ -243,22 +243,7 @@ def _build_prompt(members, duration_label, n_days, region, themes, real_attracti
     # 맛집은 AI 대신 네이버 로컬 API로 검색하므로 프롬프트에서 제외
 
     stay_rule = ""
-    if has_stay:
-        stay_rule = """
-- accommodation: 숙박 추천 3곳.
-  ※ 중요: name(숙소명)은 절대 창작하지 마세요. 여기어때(yeogi.com)에서 실제 검색되는 숙소명만 사용하세요.
-    확신할 수 없으면 name을 빈 문자열("")로 두고 area와 type만 채우세요.
-  - area: 숙박할 동네/지역명 (예: 전주 한옥마을, 강릉 경포대, 제주 애월)
-  - type: 숙소 유형 (펜션/호텔/게스트하우스/리조트/모텔 중 선택)
-  - price_per_night: 대략적인 1박 가격대 (예: 5~10만원, 10~20만원)"""
-        stay_schema = """,
-  "accommodation": [
-    {"name": "", "area": "숙박 지역명", "type": "숙소유형", "price_per_night": "가격대"},
-    {"name": "", "area": "숙박 지역명", "type": "숙소유형", "price_per_night": "가격대"},
-    {"name": "", "area": "숙박 지역명", "type": "숙소유형", "price_per_night": "가격대"}
-  ]"""
-    else:
-        stay_schema = ""
+    stay_schema = ""  # 숙소는 GPT 대신 유형별 여기어때 직접 링크로 제공
 
     mbti_summary = ", ".join(m[0] for m in members if m[0]) or "미입력"
     gender_age   = " / ".join(f"{m[1]} {int(m[2])}세" for m in members)
@@ -654,44 +639,64 @@ def run_all(
                         f"?keyword={kw}&checkIn={ci}&checkOut={co}"
                         f"&personal={actual_count}&typoCorrect=true&nonAffiliated=true")
 
+            # 유형별 여기어때 직접 링크 3종 카드
+            ACC_TYPES = [
+                {
+                    "type": "리조트",
+                    "emoji": "🏖️",
+                    "desc": "수영장·부대시설 완비, 프리미엄 숙박",
+                    "price": "평균 15~35만원 / 1박",
+                    "color": "#1D4ED8",
+                    "bg": "#EFF6FF",
+                    "border": "#93C5FD",
+                },
+                {
+                    "type": "호텔",
+                    "emoji": "🏨",
+                    "desc": "비즈니스·편의시설 갖춘 표준 숙박",
+                    "price": "평균 8~20만원 / 1박",
+                    "color": "#047857",
+                    "bg": "#ECFDF5",
+                    "border": "#6EE7B7",
+                },
+                {
+                    "type": "게스트하우스",
+                    "emoji": "🏠",
+                    "desc": "합리적 가격, 여행자 네트워킹 최적",
+                    "price": "평균 2~6만원 / 1박",
+                    "color": "#92400E",
+                    "bg": "#FFFBEB",
+                    "border": "#FCD34D",
+                },
+            ]
+            search_area = region or top_dest
             rec_html += f"""
 <hr style="border:none;border-top:1px solid #E5E7EB;margin:16px 0">
 <h2 style="color:#1D4ED8">🏨 숙소 예약</h2>
-<p style="font-size:13px;color:#6B7280;margin-bottom:10px">
-  {actual_count}명 · {checkin_str} ~ {checkout_str} ({n_nights}박) 기준으로 검색합니다.
+<p style="font-size:13px;color:#6B7280;margin-bottom:12px">
+  {actual_count}명 · {checkin_str} → {checkout_str} ({n_nights}박) · <b>{search_area}</b> 기준
 </p>
-<div style="margin-bottom:12px">
-  <a href="{_yeogi_url(top_dest)}" target="_blank"
-     style="background:#FF5A5F;color:white;padding:10px 18px;border-radius:8px;
-            text-decoration:none;font-weight:bold;font-size:14px">
-    🏠 여기어때에서 찾기
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">"""
+            for acc in ACC_TYPES:
+                kw = urllib.parse.quote(f"{search_area} {acc['type']}")
+                url = (f"https://www.yeogi.com/domestic-accommodations"
+                       f"?keyword={kw}&checkIn={checkin_str}&checkOut={checkout_str}"
+                       f"&personal={actual_count}&typoCorrect=true&nonAffiliated=true")
+                rec_html += f"""
+<div style="background:{acc['bg']};border:1px solid {acc['border']};
+            border-radius:10px;padding:14px 16px">
+  <div style="font-size:26px;margin-bottom:6px">{acc['emoji']}</div>
+  <div style="font-weight:bold;font-size:15px;color:{acc['color']};margin-bottom:4px">{acc['type']}</div>
+  <div style="font-size:12px;color:#6B7280;margin-bottom:4px">{acc['desc']}</div>
+  <div style="font-size:12px;font-weight:bold;color:{acc['color']};margin-bottom:10px">{acc['price']}</div>
+  <a href="{url}" target="_blank"
+     style="display:block;text-align:center;background:{acc['color']};color:white;
+            font-size:12px;font-weight:bold;padding:7px 10px;border-radius:6px;
+            text-decoration:none">
+    여기어때에서 보기 →
   </a>
 </div>"""
-            # AI 추천 숙소 목록 — 지역명으로만 여기어때 검색 (숙소명은 실제 확인 불가)
-            accommodations = data.get("accommodation", [])
-            if accommodations:
-                rec_html += '<div style="display:flex;flex-direction:column;gap:8px">'
-                for idx, acc in enumerate(accommodations):
-                    acc_ci = (checkin_date + timedelta(days=idx)).strftime("%Y-%m-%d")
-                    acc_co = (checkin_date + timedelta(days=idx + 1)).strftime("%Y-%m-%d")
-                    if idx == len(accommodations) - 1:
-                        acc_co = checkout_str
-                    # 숙소명은 창작일 수 있으므로 area(지역명)로만 검색
-                    area = acc.get("area", "") or region or top_dest
-                    yeogi_acc = _yeogi_url(area, acc_ci, acc_co)
-                    rec_html += f"""
-<div style="background:#FFF5F5;border-left:4px solid #FF5A5F;padding:10px 14px;border-radius:0 8px 8px 0">
-  <div style="font-weight:bold;font-size:14px;margin-bottom:2px">
-    🏨 {area} <span style="color:#6B7280;font-weight:normal;font-size:12px">({acc.get('type','')} · {acc.get('price_per_night','')})</span>
-  </div>
-  <div style="font-size:12px;color:#6B7280;margin-bottom:6px">체크인 {acc_ci} → 체크아웃 {acc_co}</div>
-  <a href="{yeogi_acc}" target="_blank"
-     style="display:inline-block;background:#FF5A5F;color:white;font-size:12px;font-weight:bold;
-            padding:5px 12px;border-radius:5px;text-decoration:none">
-    🔍 {area} 숙소 여기어때에서 보기
-  </a>
-</div>"""
-                rec_html += '</div>'
+            rec_html += "\n</div>"
 
         # ── 맛집 리스트 (네이버 로컬 API 결과 항상 표시) ──────────────────
         if True:
