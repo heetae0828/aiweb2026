@@ -799,9 +799,13 @@ def run_all(
         pdf_path = _make_pdf(data)
 
         if pdf_path:
+            import base64
+            with open(pdf_path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            filename = f"{top_dest}_여행일정표.pdf"
             pdf_link_html = f'''<div class="pdf-download-link" style="margin-top:16px">
-  <a href="/file={pdf_path}" download="{top_dest}_여행일정표.pdf">
-    📥 {top_dest}_여행일정표.pdf — 클릭하여 다운로드
+  <a href="data:application/pdf;base64,{b64}" download="{filename}">
+    📥 {filename} — 클릭하여 다운로드
   </a>
 </div>'''
         else:
